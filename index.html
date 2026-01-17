@@ -240,7 +240,14 @@
             </div>
             <div class="control-group">
                 <label>WebSocket Port</label>
-                <input type="number" id="port" value="8000">
+                <input type="number" id="port" value="8884">
+            </div>
+            <div class="control-group">
+                <label>Use SSL/TLS</label>
+                <select id="use-ssl" style="width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 16px; background: #333; color: #fff;">
+                    <option value="true">Yes (WSS - for HTTPS sites)</option>
+                    <option value="false">No (WS - for HTTP sites)</option>
+                </select>
             </div>
             <div class="control-group">
                 <label>Topic</label>
@@ -394,6 +401,7 @@
             const broker = document.getElementById('broker').value;
             const port = parseInt(document.getElementById('port').value);
             const topic = document.getElementById('topic').value;
+            const useSSL = document.getElementById('use-ssl').value === 'true';
 
             if (!broker || !port || !topic) {
                 addLog('Please fill in all connection details', 'error');
@@ -401,8 +409,10 @@
             }
 
             const clientId = 'chess_pwa_' + Math.random().toString(16).substr(2, 8);
+            const protocol = useSSL ? 'wss' : 'ws';
             
-            addLog(`Connecting to ws://${broker}:${port}/mqtt`, 'info');
+            addLog(`Connecting to ${protocol}://${broker}:${port}/mqtt`, 'info');
+            addLog(`Client ID: ${clientId}`, 'info');
             
             try {
                 mqttClient = new Paho.MQTT.Client(broker, port, '/mqtt', clientId);
@@ -420,23 +430,31 @@
 
                 const connectOptions = {
                     onSuccess: () => {
-                        addLog('Connected to MQTT broker', 'success');
+                        addLog('Connected to MQTT broker!', 'success');
                         updateConnectionStatus(true);
                         mqttClient.subscribe(topic);
                         addLog('Subscribed to ' + topic, 'success');
                     },
                     onFailure: (error) => {
                         addLog('Connection failed: ' + error.errorMessage, 'error');
-                        addLog('Make sure broker supports WebSocket on port ' + port, 'error');
+                        addLog('Error code: ' + error.errorCode, 'error');
+                        if (useSSL) {
+                            addLog('Try: Use port 8884 with SSL enabled', 'error');
+                        } else {
+                            addLog('Try: Use port 8000 without SSL', 'error');
+                        }
+                        addLog('For GitHub Pages (HTTPS), you MUST use SSL', 'error');
                         updateConnectionStatus(false);
                     },
-                    useSSL: false,
-                    timeout: 10
+                    useSSL: useSSL,
+                    timeout: 10,
+                    keepAliveInterval: 30
                 };
 
                 mqttClient.connect(connectOptions);
             } catch (error) {
                 addLog('Error creating MQTT client: ' + error.message, 'error');
+                addLog('Stack: ' + error.stack, 'error');
             }
         }
 
