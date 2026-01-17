@@ -160,7 +160,22 @@
         }
 
         .piece {
-            filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5));
+            width: 80%;
+            height: 80%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .piece.black {
+            color: #000;
+        }
+
+        .piece.white {
+            color: #fff;
+            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
         }
 
         #controls {
@@ -238,16 +253,20 @@
             topic: 'home/chess'
         };
 
-        // Chess piece symbols
-        const PIECES = {
-            white: {
-                king: '♔', queen: '♕', rook: '♖',
-                bishop: '♗', knight: '♘', pawn: '♙'
-            },
-            black: {
-                king: '♚', queen: '♛', rook: '♜',
-                bishop: '♝', knight: '♞', pawn: '♟'
-            }
+        // Chess pieces as text labels
+        const PIECE_LABELS = {
+            '♔': { label: '♔', color: 'white' },
+            '♕': { label: '♕', color: 'white' },
+            '♖': { label: '♖', color: 'white' },
+            '♗': { label: '♗', color: 'white' },
+            '♘': { label: '♘', color: 'white' },
+            '♙': { label: '♙', color: 'white' },
+            '♚': { label: '♚', color: 'black' },
+            '♛': { label: '♛', color: 'black' },
+            '♜': { label: '♜', color: 'black' },
+            '♝': { label: '♝', color: 'black' },
+            '♞': { label: '♞', color: 'black' },
+            '♟': { label: '♟', color: 'black' }
         };
 
         // Initial board setup
@@ -293,7 +312,11 @@
                     // Piece
                     const piece = document.createElement('div');
                     piece.className = 'piece';
-                    piece.textContent = board[row][col];
+                    const pieceSymbol = board[row][col];
+                    if (pieceSymbol && PIECE_LABELS[pieceSymbol]) {
+                        piece.textContent = PIECE_LABELS[pieceSymbol].label;
+                        piece.classList.add(PIECE_LABELS[pieceSymbol].color);
+                    }
                     square.appendChild(piece);
 
                     square.addEventListener('click', () => handleSquareClick(row, col, coord));
@@ -344,7 +367,15 @@
                     const coord = String.fromCharCode(65 + col) + (row + 1);
                     const square = document.querySelector(`[data-coord="${coord}"]`);
                     const piece = square.querySelector('.piece');
-                    piece.textContent = board[row][col];
+                    const pieceSymbol = board[row][col];
+                    
+                    piece.className = 'piece';
+                    if (pieceSymbol && PIECE_LABELS[pieceSymbol]) {
+                        piece.textContent = PIECE_LABELS[pieceSymbol].label;
+                        piece.classList.add(PIECE_LABELS[pieceSymbol].color);
+                    } else {
+                        piece.textContent = '';
+                    }
                 }
             }
         }
