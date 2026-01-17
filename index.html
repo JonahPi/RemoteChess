@@ -173,6 +173,14 @@
             cursor: pointer;
         }
 
+        #undo-btn {
+            background: #cc6600;
+        }
+
+        #undo-btn:active:not(:disabled) {
+            background: #a35200;
+        }
+
         #reset-btn {
             background: #0066cc;
         }
@@ -182,7 +190,7 @@
         }
 
         button:disabled {
-            background: #555;
+            background: #555 !important;
             cursor: not-allowed;
         }
     </style>
@@ -199,6 +207,7 @@
         </div>
 
         <div id="controls">
+            <button id="undo-btn" disabled>Zurück</button>
             <button id="reset-btn">Neu starten</button>
         </div>
     </div>
@@ -250,6 +259,7 @@
         let sentMessages = new Set();
         let externalLiftCoord = null;
         let fadingTimer = null;
+        let lastMove = null; // { fromRow, fromCol, toRow, toCol, movedPiece, capturedPiece }
 
         // Initialize board UI
         function initBoard() {
@@ -306,6 +316,17 @@
                 // Move piece
                 const fromCoord = selectedSquare.coord;
                 const toCoord = coord;
+
+                // Save last move for undo (before updating board)
+                lastMove = {
+                    fromRow: selectedSquare.row,
+                    fromCol: selectedSquare.col,
+                    toRow: row,
+                    toCol: col,
+                    movedPiece: board[selectedSquare.row][selectedSquare.col],
+                    capturedPiece: board[row][col]
+                };
+                document.getElementById('undo-btn').disabled = false;
 
                 // Update board
                 board[row][col] = board[selectedSquare.row][selectedSquare.col];
@@ -512,6 +533,8 @@
             board = JSON.parse(JSON.stringify(INITIAL_BOARD));
             selectedSquare = null;
             externalLiftCoord = null;
+            lastMove = null;
+            document.getElementById('undo-btn').disabled = true;
             updateBoardUI();
             clearAllLEDs();
             addLog('Board reset', 'info');
@@ -521,7 +544,28 @@
             }
         }
 
+        function undoMove() {
+            if (!lastMove) return;
+
+            // Restore pieces to original positions
+            board[lastMove.fromRow][lastMove.fromCol] = lastMove.movedPiece;
+            board[lastMove.toRow][lastMove.toCol] = lastMove.capturedPiece;
+
+            // Clear LEDs
+            clearAllLEDs();
+
+            // Update UI
+            updateBoardUI();
+
+            // Disable undo button (only works for one move)
+            lastMove = null;
+            document.getElementById('undo-btn').disabled = true;
+
+            addLog('Move undone', 'info');
+        }
+
         // Event listeners
+        document.getElementById('undo-btn').addEventListener('click', undoMove);
         document.getElementById('reset-btn').addEventListener('click', resetBoard);
 
         // Initialize
