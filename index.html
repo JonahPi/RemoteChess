@@ -184,6 +184,11 @@
             background: #990000;
         }
 
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
         #log {
             max-height: 100px;
             overflow-y: auto;
@@ -207,6 +212,14 @@
         .log-entry.received {
             color: #4f4;
         }
+
+        .log-entry.error {
+            color: #f44;
+        }
+
+        .log-entry.success {
+            color: #4f4;
+        }
     </style>
 </head>
 <body>
@@ -222,16 +235,16 @@
 
         <div id="controls">
             <div class="control-group">
-                <label>MQTT Broker</label>
-                <input type="text" id="broker" placeholder="broker.hivemq.com">
+                <label>MQTT Broker (WebSocket)</label>
+                <input type="text" id="broker" value="broker.hivemq.com">
             </div>
             <div class="control-group">
-                <label>Port</label>
-                <input type="number" id="port" value="8000" placeholder="8000">
+                <label>WebSocket Port</label>
+                <input type="number" id="port" value="8000">
             </div>
             <div class="control-group">
                 <label>Topic</label>
-                <input type="text" id="topic" value="home/chess" placeholder="home/chess">
+                <input type="text" id="topic" value="home/chess">
             </div>
             <button id="connect-btn">Connect</button>
             <button id="disconnect-btn" class="disconnect" style="display:none;">Disconnect</button>
@@ -388,32 +401,43 @@
             }
 
             const clientId = 'chess_pwa_' + Math.random().toString(16).substr(2, 8);
-            mqttClient = new Paho.MQTT.Client(broker, port, '/mqtt', clientId);
+            
+            addLog(`Connecting to ws://${broker}:${port}/mqtt`, 'info');
+            
+            try {
+                mqttClient = new Paho.MQTT.Client(broker, port, '/mqtt', clientId);
 
-            mqttClient.onConnectionLost = (responseObject) => {
-                if (responseObject.errorCode !== 0) {
-                    addLog('Connection lost: ' + responseObject.errorMessage, 'error');
-                    updateConnectionStatus(false);
-                }
-            };
+                mqttClient.onConnectionLost = (responseObject) => {
+                    if (responseObject.errorCode !== 0) {
+                        addLog('Connection lost: ' + responseObject.errorMessage, 'error');
+                        updateConnectionStatus(false);
+                    }
+                };
 
-            mqttClient.onMessageArrived = (message) => {
-                handleMQTTMessage(message.payloadString);
-            };
+                mqttClient.onMessageArrived = (message) => {
+                    handleMQTTMessage(message.payloadString);
+                };
 
-            mqttClient.connect({
-                onSuccess: () => {
-                    addLog('Connected to MQTT broker', 'success');
-                    updateConnectionStatus(true);
-                    mqttClient.subscribe(topic);
-                    addLog('Subscribed to ' + topic, 'success');
-                },
-                onFailure: (error) => {
-                    addLog('Connection failed: ' + error.errorMessage, 'error');
-                    updateConnectionStatus(false);
-                },
-                useSSL: false
-            });
+                const connectOptions = {
+                    onSuccess: () => {
+                        addLog('Connected to MQTT broker', 'success');
+                        updateConnectionStatus(true);
+                        mqttClient.subscribe(topic);
+                        addLog('Subscribed to ' + topic, 'success');
+                    },
+                    onFailure: (error) => {
+                        addLog('Connection failed: ' + error.errorMessage, 'error');
+                        addLog('Make sure broker supports WebSocket on port ' + port, 'error');
+                        updateConnectionStatus(false);
+                    },
+                    useSSL: false,
+                    timeout: 10
+                };
+
+                mqttClient.connect(connectOptions);
+            } catch (error) {
+                addLog('Error creating MQTT client: ' + error.message, 'error');
+            }
         }
 
         function disconnectMQTT() {
@@ -426,11 +450,15 @@
 
         function publishMove(message) {
             if (mqttClient && isConnected) {
-                const topic = document.getElementById('topic').value;
-                const mqttMessage = new Paho.MQTT.Message(message);
-                mqttMessage.destinationName = topic;
-                mqttClient.send(mqttMessage);
-                addLog('Sent: ' + message, 'sent');
+                try {
+                    const topic = document.getElementById('topic').value;
+                    const mqttMessage = new Paho.MQTT.Message(message);
+                    mqttMessage.destinationName = topic;
+                    mqttClient.send(mqttMessage);
+                    addLog('Sent: ' + message, 'sent');
+                } catch (error) {
+                    addLog('Publish error: ' + error.message, 'error');
+                }
             }
         }
 
@@ -464,7 +492,7 @@
 
             if (connected) {
                 indicator.classList.add('connected');
-                text.textContent = 'Connected';
+                text.textContent = 'Connected to ' + document.getElementById('broker').value;
                 connectBtn.style.display = 'none';
                 disconnectBtn.style.display = 'block';
             } else {
@@ -505,6 +533,7 @@
         // Initialize
         initBoard();
         addLog('Chess PWA ready', 'info');
+        addLog('Click Connect to start', 'info');
     </script>
 </body>
 </html>
