@@ -12,7 +12,7 @@ The 64 Neopixel are organized in 8 rows so Fields A1 to H1 have the Neopixel num
 
 The status of 64 hall sensors is detected by 8 PCBs, each of which has a MCP23017 GPIO Board Expander and 8 hall sensors to cover 1 row on the board. The 8 boards are all connected to an I2C bus. The board for the first row has the I2C address 0x20, the board for the second row has the address 0x21 and so on till the last row with board-address 0x27. The hall - sensors are connected to the  Inputs GPA0 to GPA7 of the Board expander, GPA0 corresponds to column A, GPA7 corresponds to column 7.
 
-## Programming
+## ESP-Programming
 
 ### Detecting and publishing movement
 
@@ -56,3 +56,8 @@ Time values, Blink-frequency and LED-colors shall be settable at the top of the 
 ### Demo mode
 
 Add a flag DemoMode which can be set at the beginning of the program. In demo-mode the hall-sensors are not connected and no expander boards. In this mode the program shall just check for the updates on the MQTT topic and control the neopixel stripe with 64 LEDs. The received updates and the color and number of the activated neopixel shall be shown in the serial monitor.
+
+## **Progressive Web App (PWA**)
+
+Generate a Web App which is hosted in the Git-repository for this project. The Web App shall simulate the Chess-board and shall be optimized for an iPhone 16 from the layout. All chess figures are depicted by simple icons. the Icons for one player shall be black, the ones for the other player white. By touching a figure ones it is activated for moving. Touching a field afterwards will place the figure there. In case the destination field was not empty, the destination figure is replaced with the figure which has been selected. When moving the figures no chess rules need to be considered. Touching the figure shall have the same effect as lifting a figure on the real chess box including the MQTT message. The LEDs shall be simulated by small dots on the simulated chess field. 
+
