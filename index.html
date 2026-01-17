@@ -173,14 +173,6 @@
             cursor: pointer;
         }
 
-        #disconnect-btn {
-            background: #cc0000;
-        }
-
-        #disconnect-btn:active {
-            background: #990000;
-        }
-
         #reset-btn {
             background: #0066cc;
         }
@@ -207,7 +199,6 @@
         </div>
 
         <div id="controls">
-            <button id="disconnect-btn" style="display:none;">Disconnect</button>
             <button id="reset-btn">Neu starten</button>
         </div>
     </div>
@@ -391,6 +382,8 @@
                     if (responseObject.errorCode !== 0) {
                         addLog('Connection lost: ' + responseObject.errorMessage, 'error');
                         updateConnectionStatus(false);
+                        // Auto-reconnect after connection loss
+                        setTimeout(connectMQTT, 3000);
                     }
                 };
 
@@ -419,14 +412,6 @@
                 mqttClient.connect(connectOptions);
             } catch (error) {
                 addLog('Error: ' + error.message, 'error');
-                updateConnectionStatus(false);
-            }
-        }
-
-        function disconnectMQTT() {
-            if (mqttClient && isConnected) {
-                mqttClient.disconnect();
-                addLog('Disconnected from MQTT', 'info');
                 updateConnectionStatus(false);
             }
         }
@@ -509,16 +494,13 @@
             isConnected = connected;
             const indicator = document.getElementById('status-indicator');
             const text = document.getElementById('status-text');
-            const disconnectBtn = document.getElementById('disconnect-btn');
 
             if (connected) {
                 indicator.classList.add('connected');
                 text.textContent = 'Connected';
-                disconnectBtn.style.display = 'block';
             } else {
                 indicator.classList.remove('connected');
                 text.textContent = 'Disconnected';
-                disconnectBtn.style.display = 'none';
             }
         }
 
@@ -529,13 +511,17 @@
         function resetBoard() {
             board = JSON.parse(JSON.stringify(INITIAL_BOARD));
             selectedSquare = null;
+            externalLiftCoord = null;
             updateBoardUI();
             clearAllLEDs();
             addLog('Board reset', 'info');
+            // Try to reconnect if not connected
+            if (!isConnected) {
+                connectMQTT();
+            }
         }
 
         // Event listeners
-        document.getElementById('disconnect-btn').addEventListener('click', disconnectMQTT);
         document.getElementById('reset-btn').addEventListener('click', resetBoard);
 
         // Initialize
