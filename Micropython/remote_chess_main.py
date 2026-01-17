@@ -12,7 +12,10 @@ import secrets
 
 # ============= CONFIGURATION =============
 # Demo Mode - Set to True to run without hall sensors
-DEMO_MODE = False  # Set to True for testing without hardware
+DEMO_MODE = True  # Set to True for testing without hardware
+
+# MQTT Topic
+MQTT_TOPIC = b"home/chess"
 
 # LED Colors (R, G, B)
 COLOR_LIFT = (255, 0, 0)      # Red for lifted pieces
@@ -23,9 +26,6 @@ COLOR_OFF = (0, 0, 0)         # Off
 # Timing
 FADING_TIMEOUT_MS = 20000     # 20 seconds
 BLINK_FREQUENCY_MS = 200      # 200ms for blinking
-
-# MQTT Topic
-MQTT_TOPIC = b"/remotechess"
 
 # Pin Configuration (Xiao ESP32-C6)
 PIN_SDA = 4  # D4
@@ -107,8 +107,14 @@ def fading_callback(timer):
     """Timer callback for fading timeout"""
     global LML, LMP, LMK
     if DEMO_MODE:
-        print(f"[DEMO] Fading timeout - clearing LEDs for LML={LML}, LMP={LMP}, LMK={LMK}")
+        print(f"[DEMO] Fading timeout - clearing all LEDs")
+    # Clear specific coordinates
     clear_neopixels([LML, LMP, LMK])
+    # Clear all LEDs
+    for i in range(NUM_NEOPIXELS):
+        np[i] = COLOR_OFF
+    np.write()
+    # Reset state variables
     LML = ""
     LMP = ""
     LMK = ""
@@ -147,6 +153,13 @@ def mqtt_callback(topic, msg):
             print(f"[DEMO] Place detected at {coord}")
         set_neopixel(coord, COLOR_PLACE)
         LMP = coord
+        # If LMK is not empty, clear it and stop blinking
+        if LMK:
+            if DEMO_MODE:
+                print(f"[DEMO] Clearing killed piece at {LMK} and stopping blink")
+            LMK = ""
+            if blink_timer:
+                blink_timer.deinit()
         if fading_timer:
             fading_timer.deinit()
         fading_timer = Timer(0)
@@ -267,17 +280,30 @@ def main():
     
     # Connect to MQTT
     print("Connecting to MQTT broker...")
-    mqtt_client = MQTTClient(
-        secrets.MQTT_CLIENT_ID,
-        secrets.MQTT_BROKER,
-        port=secrets.MQTT_PORT,
-        user=secrets.MQTT_USER,
-        password=secrets.MQTT_PASSWORD
-    )
-    mqtt_client.set_callback(mqtt_callback)
-    mqtt_client.connect()
-    mqtt_client.subscribe(MQTT_TOPIC)
-    print(f"MQTT connected and subscribed to {MQTT_TOPIC.decode()}")
+    print(f"Broker: {secrets.MQTT_BROKER}:{secrets.MQTT_PORT}")
+    print(f"Client ID: {secrets.MQTT_CLIENT_ID}")
+    
+    try:
+        mqtt_client = MQTTClient(
+            secrets.MQTT_CLIENT_ID,
+            secrets.MQTT_BROKER,
+            port=secrets.MQTT_PORT,
+            user=secrets.MQTT_USER if secrets.MQTT_USER else None,
+            password=secrets.MQTT_PASSWORD if secrets.MQTT_PASSWORD else None
+        )
+        mqtt_client.set_callback(mqtt_callback)
+        mqtt_client.connect()
+        mqtt_client.subscribe(MQTT_TOPIC)
+        print(f"MQTT connected and subscribed to {MQTT_TOPIC.decode()}")
+    except Exception as e:
+        print(f"MQTT connection failed: {e}")
+        print("Error codes: 1=Protocol, 2=ClientID, 3=Unavailable, 4=Auth, 5=Not authorized")
+        print("Check your secrets.py file:")
+        print("  - MQTT_BROKER address")
+        print("  - MQTT_PORT (usually 1883)")
+        print("  - MQTT_USER and MQTT_PASSWORD")
+        print("  - Ensure broker allows this client ID")
+        raise
     
     # Initialize hall sensor states (only if not in demo mode)
     if not DEMO_MODE:
