@@ -12,7 +12,9 @@ The 64 Neopixel are organized in 8 rows so Fields A1 to H1 have the Neopixel num
 
 The status of 64 hall sensors is detected by 8 PCBs, each of which has a MCP23017 GPIO Board Expander and 8 hall sensors to cover 1 row on the board. The 8 boards are all connected to an I2C bus. The board for the first row has the I2C address 0x20, the board for the second row has the address 0x21 and so on till the last row with board-address 0x27. The hall - sensors are connected to the  Inputs GPA0 to GPA7 of the Board expander, GPA0 corresponds to column A, GPA7 corresponds to column 7.
 
-## Detecting and publishing movement
+## Programming
+
+### Detecting and publishing movement
 
 When initializing the program, the following 4 states should be safed:
 LastMoveLift: LML="", LastMovePlace: LMP="", LastMoveKilled: LMK="", FigureInAir = *false*,
@@ -23,7 +25,7 @@ When the hall-sensor changes from *off* to *on*, the corresponding coordinate sh
 
 If a hall status changes from on to off and FigureInAir is equal to *true* then the  coordinate shall be stored in status LMK and the topic "*coordinate*-X" shall be published.
 
-## Receiving and Indicating movement
+### Receiving and Indicating movement
 
 New messages on topic /remotechess shall trigger the following actions:
 
@@ -35,7 +37,7 @@ New messages on topic /remotechess shall trigger the following actions:
 
 When the timer fading expires, the neopixels corresponding to the coordinates stored in LMP, LML and LMX shall be switched to *off*
 
-## Programming
+### Pin-assignment
 
 The program shall be written in Micropython and suitable for the development board Xiao ESP32-C6. Use the following pins:
 
@@ -45,6 +47,12 @@ The program shall be written in Micropython and suitable for the development boa
 | SDA      | D4         |
 | Neopixel | D7         |
 
+### Secrets file
+
 The access data (passwords, usernames, keys and IP-addresses) for the the Wifi and to the MQTT broker shall be stored in a dedicated secrets - file.
 
-Time values, Blink-frequency and LED-colors shall be settable at the top of the program.
+Time values, Blink-frequency and LED-colors shall be settable at the top of the pro
+
+### Demo mode
+
+Add a flag DemoMode which can be set at the beginning of the program. In demo-mode the hall-sensors are not connected and no expander boards. In this mode the program shall just check for the updates on the MQTT topic and control the neopixel stripe with 64 LEDs. The received updates and the color and number of the activated neopixel shall be shown in the serial monitor.
