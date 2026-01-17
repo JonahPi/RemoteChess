@@ -208,7 +208,7 @@
 
         <div id="controls">
             <button id="disconnect-btn" style="display:none;">Disconnect</button>
-            <button id="reset-btn">Reset Board</button>
+            <button id="reset-btn">Neu starten</button>
         </div>
     </div>
 
@@ -256,6 +256,9 @@
         let mqttClient = null;
         let isConnected = false;
         let ledStates = {};
+        let sentMessages = new Set();
+        let externalLiftCoord = null;
+        let fadingTimer = null;
 
         // Initialize board UI
         function initBoard() {
@@ -265,7 +268,7 @@
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
                     const square = document.createElement('div');
-                    const coord = String.fromCharCode(65 + col) + (row + 1);
+                    const coord = String.fromCharCode(65 + col) + (8 - row);
                     
                     square.className = 'square ' + ((row + col) % 2 === 0 ? 'light' : 'dark');
                     square.dataset.row = row;
@@ -333,7 +336,7 @@
         function updateBoardUI() {
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
-                    const coord = String.fromCharCode(65 + col) + (row + 1);
+                    const coord = String.fromCharCode(65 + col) + (8 - row);
                     const square = document.querySelector(`[data-coord="${coord}"]`);
                     const piece = square.querySelector('.piece');
                     const pieceSymbol = board[row][col];
@@ -431,6 +434,7 @@
         function publishMove(message) {
             if (mqttClient && isConnected) {
                 try {
+                    sentMessages.add(message);
                     const mqttMessage = new Paho.MQTT.Message(message);
                     mqttMessage.destinationName = MQTT_CONFIG.topic;
                     mqttClient.send(mqttMessage);
@@ -449,13 +453,52 @@
             const coord = message.substring(0, message.length - 2);
             const action = message.charAt(message.length - 1);
 
+            // Check if this message was sent by us
+            const isLocalMessage = sentMessages.has(message);
+            if (isLocalMessage) {
+                sentMessages.delete(message);
+            }
+
             if (action === 'L') {
                 // Lift
                 clearAllLEDs();
                 updateLED(coord, 'red', false);
+
+                // Clear fading timer on new lift
+                if (fadingTimer) {
+                    clearTimeout(fadingTimer);
+                    fadingTimer = null;
+                }
+
+                // Track external lift for piece movement
+                if (!isLocalMessage) {
+                    externalLiftCoord = coord;
+                }
             } else if (action === 'P') {
                 // Place
                 updateLED(coord, 'green', false);
+
+                // If external move, update board
+                if (!isLocalMessage && externalLiftCoord) {
+                    const fromCol = externalLiftCoord.charCodeAt(0) - 65;
+                    const fromRow = 8 - parseInt(externalLiftCoord.charAt(1));
+                    const toCol = coord.charCodeAt(0) - 65;
+                    const toRow = 8 - parseInt(coord.charAt(1));
+
+                    board[toRow][toCol] = board[fromRow][fromCol];
+                    board[fromRow][fromCol] = '';
+                    updateBoardUI();
+                    externalLiftCoord = null;
+                }
+
+                // Start 20s fading timer
+                if (fadingTimer) {
+                    clearTimeout(fadingTimer);
+                }
+                fadingTimer = setTimeout(() => {
+                    clearAllLEDs();
+                    fadingTimer = null;
+                }, 20000);
             } else if (action === 'X') {
                 // Killed
                 updateLED(coord, 'red', true);
