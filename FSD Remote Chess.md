@@ -32,10 +32,10 @@ New messages on topic /remotechess shall trigger the following actions:
 | Message format | Action                                                       |
 | -------------- | ------------------------------------------------------------ |
 | *coordinate*-L | 1. switch the Neopixel correesponding to *coordinate* to red<br />2. set neopixels corresponding to coordinate stored in LML, LMP and LMX to *off* (skip the neopixel if the variable is empty)<br />3. set values in LMP and LMX to ""<br />4. set value of LML to *coordinate*<br />5. stop the timer "fading" |
-| *coordinate*-P | 1. switch the neopixel correspondig to coordinate to green<br />2. reset/start the timer "fading" and set it to 20s<br />3. set value of LMP to *coordinate* |
+| *coordinate*-P | 1. switch the neopixel correspondig to coordinate to green<br />2. reset/start the timer "fading" and set it to 20s<br />3. set value of LMP to *coordinate*<br />4. if LMX is not empty, set it to empty and stop the blinking |
 | *coordinate*-X | 1. switch the neopixel corresponding to *coordinate* to red blinking (200ms frequency)<br />2. set value of LMX to *coordinate* |
 
-When the timer fading expires, the neopixels corresponding to the coordinates stored in LMP, LML and LMX shall be switched to *off*
+When the timer fading expires, the neopixels corresponding to the coordinates stored in LMP, LML and LMX shall be switched to *off* and all LEDs shall be switched to off.
 
 ### Pin-assignment
 
