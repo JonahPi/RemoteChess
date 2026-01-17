@@ -1,29 +1,4 @@
-        button {
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            background: #0066cc;
-            color: #fff;
-            cursor: pointer;
-        }
-
-        button:active {
-            background: #0052a3;
-        }
-
-        button.disconnect {
-            background: #cc0000;
-        }
-
-        button.disconnect:active {
-            background: #990000;
-        }
-
-        button:disabled {
-            background: #555;
-            cursor: not-allowed;
-        }<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -190,39 +165,33 @@
         #controls button {
             flex: 1;
             margin: 0;
-        }
-
-        #log {
-            max-height: 100px;
-            overflow-y: auto;
-            background: #111;
-            padding: 10px;
+            padding: 12px;
+            border: none;
             border-radius: 8px;
-            font-size: 12px;
-            font-family: monospace;
-            margin-top: 10px;
-            display: none;
+            font-size: 16px;
+            color: #fff;
+            cursor: pointer;
         }
 
-        .log-entry {
-            margin: 2px 0;
-            color: #888;
+        #disconnect-btn {
+            background: #cc0000;
         }
 
-        .log-entry.sent {
-            color: #4af;
+        #disconnect-btn:active {
+            background: #990000;
         }
 
-        .log-entry.received {
-            color: #4f4;
+        #reset-btn {
+            background: #0066cc;
         }
 
-        .log-entry.error {
-            color: #f44;
+        #reset-btn:active {
+            background: #0052a3;
         }
 
-        .log-entry.success {
-            color: #4f4;
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
         }
     </style>
 </head>
@@ -238,7 +207,7 @@
         </div>
 
         <div id="controls">
-            <button id="disconnect-btn" class="disconnect" style="display:none;">Disconnect</button>
+            <button id="disconnect-btn" style="display:none;">Disconnect</button>
             <button id="reset-btn">Reset Board</button>
         </div>
     </div>
