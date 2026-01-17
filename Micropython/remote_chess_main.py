@@ -11,6 +11,9 @@ from umqtt.simple import MQTTClient
 import secrets
 
 # ============= CONFIGURATION =============
+# Demo Mode - Set to True to run without hall sensors
+DEMO_MODE = False  # Set to True for testing without hardware
+
 # LED Colors (R, G, B)
 COLOR_LIFT = (255, 0, 0)      # Red for lifted pieces
 COLOR_PLACE = (0, 255, 0)     # Green for placed pieces
@@ -47,7 +50,7 @@ fading_timer = None
 blink_timer = None
 blink_state = False
 
-# Track previous hall sensor states
+# Track previous hall sensor states (only used in non-demo mode)
 previous_hall_states = [[False] * 8 for _ in range(8)]
 
 # ============= MCP23017 Functions =============
@@ -83,6 +86,8 @@ def set_neopixel(coord, color):
         idx = coordinate_to_neopixel(coord)
         np[idx] = color
         np.write()
+        if DEMO_MODE:
+            print(f"[DEMO] NeoPixel #{idx} ({coord}) -> RGB{color}")
 
 def clear_neopixels(coords):
     """Clear neopixels at given coordinates"""
@@ -101,6 +106,8 @@ def blink_callback(timer):
 def fading_callback(timer):
     """Timer callback for fading timeout"""
     global LML, LMP, LMK
+    if DEMO_MODE:
+        print(f"[DEMO] Fading timeout - clearing LEDs for LML={LML}, LMP={LMP}, LMK={LMK}")
     clear_neopixels([LML, LMP, LMK])
     LML = ""
     LMP = ""
@@ -124,6 +131,8 @@ def mqtt_callback(topic, msg):
     
     if action == 'L':
         # Lift action
+        if DEMO_MODE:
+            print(f"[DEMO] Lift detected at {coord}")
         set_neopixel(coord, COLOR_LIFT)
         clear_neopixels([LML, LMP, LMK])
         LMP = ""
@@ -134,6 +143,8 @@ def mqtt_callback(topic, msg):
     
     elif action == 'P':
         # Place action
+        if DEMO_MODE:
+            print(f"[DEMO] Place detected at {coord}")
         set_neopixel(coord, COLOR_PLACE)
         LMP = coord
         if fading_timer:
@@ -143,6 +154,8 @@ def mqtt_callback(topic, msg):
     
     elif action == 'X':
         # Killed action
+        if DEMO_MODE:
+            print(f"[DEMO] Piece killed at {coord}")
         LMK = coord
         if blink_timer:
             blink_timer.deinit()
@@ -224,18 +237,23 @@ def main():
     
     print("=== FSD Remote Chess Starting ===")
     
-    # Initialize I2C
-    print("Initializing I2C...")
-    i2c = I2C(0, scl=Pin(PIN_SCL), sda=Pin(PIN_SDA), freq=100000)
+    if DEMO_MODE:
+        print("*** DEMO MODE ENABLED ***")
+        print("Hall sensors disabled - MQTT receive only mode")
     
-    # Initialize MCP23017 chips
-    print("Initializing MCP23017 chips...")
-    for address in MCP23017_ADDRESSES:
-        try:
-            mcp23017_init(i2c, address)
-            print(f"MCP23017 at 0x{address:02X} initialized")
-        except Exception as e:
-            print(f"Error initializing MCP23017 at 0x{address:02X}: {e}")
+    # Initialize I2C (only if not in demo mode)
+    if not DEMO_MODE:
+        print("Initializing I2C...")
+        i2c = I2C(0, scl=Pin(PIN_SCL), sda=Pin(PIN_SDA), freq=100000)
+        
+        # Initialize MCP23017 chips
+        print("Initializing MCP23017 chips...")
+        for address in MCP23017_ADDRESSES:
+            try:
+                mcp23017_init(i2c, address)
+                print(f"MCP23017 at 0x{address:02X} initialized")
+            except Exception as e:
+                print(f"Error initializing MCP23017 at 0x{address:02X}: {e}")
     
     # Initialize NeoPixels
     print("Initializing NeoPixels...")
@@ -261,17 +279,20 @@ def main():
     mqtt_client.subscribe(MQTT_TOPIC)
     print(f"MQTT connected and subscribed to {MQTT_TOPIC.decode()}")
     
-    # Initialize hall sensor states
-    print("Reading initial hall sensor states...")
-    for row_idx, address in enumerate(MCP23017_ADDRESSES):
-        try:
-            gpio_state = mcp23017_read_gpio(i2c, address)
-            for col_idx in range(8):
-                previous_hall_states[row_idx][col_idx] = bool(gpio_state & (1 << col_idx))
-        except Exception as e:
-            print(f"Error reading initial state: {e}")
+    # Initialize hall sensor states (only if not in demo mode)
+    if not DEMO_MODE:
+        print("Reading initial hall sensor states...")
+        for row_idx, address in enumerate(MCP23017_ADDRESSES):
+            try:
+                gpio_state = mcp23017_read_gpio(i2c, address)
+                for col_idx in range(8):
+                    previous_hall_states[row_idx][col_idx] = bool(gpio_state & (1 << col_idx))
+            except Exception as e:
+                print(f"Error reading initial state: {e}")
     
     print("=== Remote Chess Ready ===")
+    if DEMO_MODE:
+        print("Waiting for MQTT messages...")
     
     # Main loop
     try:
@@ -279,8 +300,9 @@ def main():
             # Check for MQTT messages
             mqtt_client.check_msg()
             
-            # Scan hall sensors
-            scan_hall_sensors()
+            # Scan hall sensors (only if not in demo mode)
+            if not DEMO_MODE:
+                scan_hall_sensors()
             
             # Small delay to avoid overwhelming the system
             time.sleep(0.05)
