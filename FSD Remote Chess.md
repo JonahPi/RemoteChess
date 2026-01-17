@@ -53,11 +53,44 @@ The access data (passwords, usernames, keys and IP-addresses) for the the Wifi a
 
 Time values, Blink-frequency and LED-colors shall be settable at the top of the pro
 
+### MQTT Broker
+
+Use the following MQTT Broker Configuration
+
+​    broker: 'broker.hivemq.com',
+​    port: 8884,
+​    useSSL: true,
+​    topic: 'home/chess'
+
 ### Demo mode
 
 Add a flag DemoMode which can be set at the beginning of the program. In demo-mode the hall-sensors are not connected and no expander boards. In this mode the program shall just check for the updates on the MQTT topic and control the neopixel stripe with 64 LEDs. The received updates and the color and number of the activated neopixel shall be shown in the serial monitor.
 
 ## **Progressive Web App (PWA**)
 
-Generate a Web App which is hosted in the Git-repository for this project. The Web App shall simulate the Chess-board and shall be optimized for an iPhone 16 from the layout. All chess figures are depicted by simple icons. the Icons for one player shall be black, the ones for the other player white. By touching a figure ones it is activated for moving. Touching a field afterwards will place the figure there. In case the destination field was not empty, the destination figure is replaced with the figure which has been selected. When moving the figures no chess rules need to be considered. Touching the figure shall have the same effect as lifting a figure on the real chess box including the MQTT message. The LEDs shall be simulated by small dots on the simulated chess field. 
+### Summary
+
+The Web App allows the simulation of the real chess board. So one player can use the app and the other player uses the real board. Alternatively both players can use the app or both players can use a real board
+
+### Architecture
+
+The Web App shall be hosted as page in the Git-repository for this project ([Remote Chess](https://jonahpi.github.io/RemoteChess/)). The Web App shall simulate the Chess-board and shall be optimized for an iPhone 16 from the layout. By touching a figure ones it is activated for moving. Touching a field afterwards will place the figure there. In case the destination field was not empty, the destination figure is replaced with the figure which has been selected. When moving the figures no chess rules need to be considered. Touching the figure shall have the same effect as lifting a figure on the real chess box including the MQTT message. The LEDs shall be simulated by small dots on the simulated chess field. 
+
+When the App receives a MQTT message of type *coordinate*-L which has not been triggered by touching a figure in the app itself, this means that the other player has lifted a figure. The App shall then wait for the message that a figure has been placed (*coordinate*-P) and move the corresponding icon from the lift-corrdinates to the place-coordinates.
+
+### Icon Design
+
+ All chess figures are depicted by simple icons. the Icons for one player shall be black, the ones for the other player white
+
+1. **Black pieces** - Displayed in pure black color (#000)
+2. **White pieces** - Displayed in white with a black outline/shadow so they're visible on light squares
+3. **Consistent rendering** - All pieces now use the same Unicode symbols but with CSS styling to ensure they look uniform
+4. **Black party**: Black icons (♚ ♛ ♜ ♝ ♞ ♟)
+5. **White party**: White icons with black outline (♔ ♕ ♖ ♗ ♘ ♙)
+
+### Screen Layout
+
+The chess board shall be square an take the full width of the screen. On the top shall be a status indication which states if the program is still connected to the MQTT Broker. On disconnect or on start of the program it shall automatically try to connect.
+
+A button below the chess board states "Neu starten" it will reset the board to the start position. White is on the bottom, black on the top.
 
