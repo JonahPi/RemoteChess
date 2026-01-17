@@ -1,4 +1,29 @@
-<!DOCTYPE html>
+        button {
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            background: #0066cc;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        button:active {
+            background: #0052a3;
+        }
+
+        button.disconnect {
+            background: #cc0000;
+        }
+
+        button.disconnect:active {
+            background: #990000;
+        }
+
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -143,50 +168,13 @@
             background: #2a2a2a;
             border-radius: 10px;
             margin-top: 10px;
+            display: flex;
+            gap: 10px;
         }
 
-        .control-group {
-            margin-bottom: 15px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 14px;
-            color: #aaa;
-        }
-
-        input, button {
-            width: 100%;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            background: #333;
-            color: #fff;
-        }
-
-        button {
-            background: #0066cc;
-            cursor: pointer;
-            margin-top: 5px;
-        }
-
-        button:active {
-            background: #0052a3;
-        }
-
-        button.disconnect {
-            background: #cc0000;
-        }
-
-        button.disconnect:active {
-            background: #990000;
-        }
-
-        button:disabled {
-            background: #555;
-            cursor: not-allowed;
+        #controls button {
+            flex: 1;
+            margin: 0;
         }
 
         #log {
@@ -198,6 +186,7 @@
             font-size: 12px;
             font-family: monospace;
             margin-top: 10px;
+            display: none;
         }
 
         .log-entry {
@@ -234,34 +223,21 @@
         </div>
 
         <div id="controls">
-            <div class="control-group">
-                <label>MQTT Broker (WebSocket)</label>
-                <input type="text" id="broker" value="broker.hivemq.com">
-            </div>
-            <div class="control-group">
-                <label>WebSocket Port</label>
-                <input type="number" id="port" value="8884">
-            </div>
-            <div class="control-group">
-                <label>Use SSL/TLS</label>
-                <select id="use-ssl" style="width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 16px; background: #333; color: #fff;">
-                    <option value="true">Yes (WSS - for HTTPS sites)</option>
-                    <option value="false">No (WS - for HTTP sites)</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label>Topic</label>
-                <input type="text" id="topic" value="home/chess">
-            </div>
-            <button id="connect-btn">Connect</button>
             <button id="disconnect-btn" class="disconnect" style="display:none;">Disconnect</button>
             <button id="reset-btn">Reset Board</button>
-            <div id="log"></div>
         </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <script>
+        // MQTT Configuration (hardcoded)
+        const MQTT_CONFIG = {
+            broker: 'broker.hivemq.com',
+            port: 8884,
+            useSSL: true,
+            topic: 'home/chess'
+        };
+
         // Chess piece symbols
         const PIECES = {
             white: {
@@ -398,21 +374,12 @@
 
         // MQTT Functions
         function connectMQTT() {
-            const broker = document.getElementById('broker').value;
-            const port = parseInt(document.getElementById('port').value);
-            const topic = document.getElementById('topic').value;
-            const useSSL = document.getElementById('use-ssl').value === 'true';
-
-            if (!broker || !port || !topic) {
-                addLog('Please fill in all connection details', 'error');
-                return;
-            }
+            const { broker, port, topic, useSSL } = MQTT_CONFIG;
 
             const clientId = 'chess_pwa_' + Math.random().toString(16).substr(2, 8);
             const protocol = useSSL ? 'wss' : 'ws';
             
             addLog(`Connecting to ${protocol}://${broker}:${port}/mqtt`, 'info');
-            addLog(`Client ID: ${clientId}`, 'info');
             
             try {
                 mqttClient = new Paho.MQTT.Client(broker, port, '/mqtt', clientId);
@@ -437,14 +404,9 @@
                     },
                     onFailure: (error) => {
                         addLog('Connection failed: ' + error.errorMessage, 'error');
-                        addLog('Error code: ' + error.errorCode, 'error');
-                        if (useSSL) {
-                            addLog('Try: Use port 8884 with SSL enabled', 'error');
-                        } else {
-                            addLog('Try: Use port 8000 without SSL', 'error');
-                        }
-                        addLog('For GitHub Pages (HTTPS), you MUST use SSL', 'error');
                         updateConnectionStatus(false);
+                        // Auto-retry after 5 seconds
+                        setTimeout(connectMQTT, 5000);
                     },
                     useSSL: useSSL,
                     timeout: 10,
@@ -453,8 +415,8 @@
 
                 mqttClient.connect(connectOptions);
             } catch (error) {
-                addLog('Error creating MQTT client: ' + error.message, 'error');
-                addLog('Stack: ' + error.stack, 'error');
+                addLog('Error: ' + error.message, 'error');
+                updateConnectionStatus(false);
             }
         }
 
@@ -469,9 +431,8 @@
         function publishMove(message) {
             if (mqttClient && isConnected) {
                 try {
-                    const topic = document.getElementById('topic').value;
                     const mqttMessage = new Paho.MQTT.Message(message);
-                    mqttMessage.destinationName = topic;
+                    mqttMessage.destinationName = MQTT_CONFIG.topic;
                     mqttClient.send(mqttMessage);
                     addLog('Sent: ' + message, 'sent');
                 } catch (error) {
@@ -505,34 +466,21 @@
             isConnected = connected;
             const indicator = document.getElementById('status-indicator');
             const text = document.getElementById('status-text');
-            const connectBtn = document.getElementById('connect-btn');
             const disconnectBtn = document.getElementById('disconnect-btn');
 
             if (connected) {
                 indicator.classList.add('connected');
-                text.textContent = 'Connected to ' + document.getElementById('broker').value;
-                connectBtn.style.display = 'none';
+                text.textContent = 'Connected';
                 disconnectBtn.style.display = 'block';
             } else {
                 indicator.classList.remove('connected');
                 text.textContent = 'Disconnected';
-                connectBtn.style.display = 'block';
                 disconnectBtn.style.display = 'none';
             }
         }
 
         function addLog(message, type = 'info') {
-            const log = document.getElementById('log');
-            const entry = document.createElement('div');
-            entry.className = 'log-entry ' + type;
-            entry.textContent = new Date().toLocaleTimeString() + ' - ' + message;
-            log.appendChild(entry);
-            log.scrollTop = log.scrollHeight;
-
-            // Keep only last 50 entries
-            while (log.children.length > 50) {
-                log.removeChild(log.firstChild);
-            }
+            console.log(`[${type}] ${message}`);
         }
 
         function resetBoard() {
@@ -544,14 +492,15 @@
         }
 
         // Event listeners
-        document.getElementById('connect-btn').addEventListener('click', connectMQTT);
         document.getElementById('disconnect-btn').addEventListener('click', disconnectMQTT);
         document.getElementById('reset-btn').addEventListener('click', resetBoard);
 
         // Initialize
         initBoard();
         addLog('Chess PWA ready', 'info');
-        addLog('Click Connect to start', 'info');
+        
+        // Auto-connect on load
+        connectMQTT();
     </script>
 </body>
 </html>
