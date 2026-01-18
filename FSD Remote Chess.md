@@ -12,6 +12,16 @@ The 64 Neopixel are organized in 8 rows so Fields A1 to H1 have the Neopixel num
 
 The status of 64 hall sensors is detected by 8 PCBs, each of which has a MCP23017 GPIO Board Expander and 8 hall sensors to cover 1 row on the board. The 8 boards are all connected to an I2C bus. The board for the first row has the I2C address 0x20, the board for the second row has the address 0x21 and so on till the last row with board-address 0x27. The hall - sensors are connected to the  Inputs GPA0 to GPA7 of the Board expander, GPA0 corresponds to column A, GPA7 corresponds to column 7.
 
+#### Module test
+
+The 8 PCBs shall be tested separately before the complete board assembly. To do this the I2C connections (SDA & SCL), the Neopixel data input (DIN) and the 5V input is directly connected to the XIAO ESP32-C6 (s.a. PIN assignement further below).
+
+The test program has 3 steps:
+
+1. Check if one of the permissible I2C addresses from 0x21 to 0x27 is set and print the address found in the serial terminal. 
+2. Switch every single of the 8 Neopixel on and off in the 3 RGB colors, only one Neopixel at at a time shall be switched on. The frequency should be 500ms but configurable in a constant called frequency. So the test sequence looks like (Led 1 -> red -> green -> blue -> off, Led 2 -> red -> green -> blue -> off, ...and so on)
+3. Switch in a loop which continuously detects the state of the hall-sensors, if a magnet is detected it should show the corresponding LED in green, if no magnet is detected the corresponding LED should be off. The brightness of the LEDs shall be reduced to 40%. Print the number of the hallsensors which detected a magnet in the serial window.
+
 ## ESP-Programming
 
 ### Detecting and publishing movement
