@@ -45,7 +45,7 @@ New messages on topic /remotechess shall trigger the following actions:
 | *coordinate*-P | 1. switch the neopixel correspondig to coordinate to green<br />2. reset/start the timer "fading" and set it to 20s<br />3. set value of LMP to *coordinate*<br />4. if LMX is not empty, set it to empty and stop the blinking |
 | *coordinate*-X | 1. switch the neopixel corresponding to *coordinate* to red blinking (200ms frequency)<br />2. set value of LMX to *coordinate* |
 
-When the timer fading expires, the neopixels corresponding to the coordinates stored in LMP, LML and LMX shall be switched to *off* and all LEDs shall be switched to off.
+When the timer fading expires, the Neopixels corresponding to the coordinates stored in LMP, LML and LMX shall be switched to *off* and all LEDs shall be switched to off.
 
 ### Pin-assignment
 
@@ -88,13 +88,17 @@ The Web App shall be hosted as page in the Git-repository for this project ([Rem
 
 When starting the program it shall automatically try to connect, when it gets disconnected it shall try to reconnect.
 
-A button called "Zurück" allows to undo the latest action on App. It will move the figures which has been moved by the user back to the last position, the LEDs are switched off and in case another figure has been killed, the figure should be replaced to its original position. "Zurück" only needs to work for one move. the button shall be greyed out when it has been used and re-activated after the next move.
+A button called "Zurück" allows to undo the latest action on App. It will move the figures which has been moved by the user back to the last position, the LEDs are switched off and in case another figure has been killed, the figure should be replaced to its original position. "Zurück" only needs to work for one move. the button shall be greyed out when it has been used and re-activated after the next move. When "Zurück" has been clicked, send the message "undo" to the MQTT topic. When receiving the MQTT message "undo", undo the last figure placement.
 
 A button called "Neu starten" will reset the board to the start position. White is on the bottom, black on the top.
 
 A button called "Wechsel" shall flip the entire board updside down, so that the player sees the black figures on the bottom and the white figures on the top. Pressing the button again, switches back to the original setup with white figures on the bottom and black on the top.
 
-When the App receives a MQTT message of type *coordinate*-L which has not been triggered by touching a figure in the app itself, this means that the other player has lifted a figure. The App shall then wait for the message that a figure has been placed (*coordinate*-P) and move the corresponding icon from the lift-corrdinates to the place-coordinates.
+When the App receives a MQTT message of type *coordinate*-L which has not been triggered by touching a figure in the app itself, this means that the other player has lifted a figure. The App shall then wait for the message that a figure has been placed (*coordinate*-P) and move the corresponding icon from the lift-coordinates to the place-coordinates.
+
+When the lift location and the place location of a pawn is the same, change the pawn to a Queen, if it is lifted and placed again to the same location, change it back to a pawn. All other figures, shall remain the same when they are lifted and placed on the same location.
+
+
 
 ### Icon Design
 
@@ -105,12 +109,13 @@ When the App receives a MQTT message of type *coordinate*-L which has not been t
 3. **Consistent rendering** - All pieces now use the same Unicode symbols but with CSS styling to ensure they look uniform
 4. **Black party**: Black icons (♚ ♛ ♜ ♝ ♞ ♟)
 5. **White party**: White icons with black outline (♔ ♕ ♖ ♗ ♘ ♙)
+6. Enforce the usage of the fonts `Noto Sans Symbols` or `Chess Merida`for rendering the symbols.
 
 ### Screen Layout
 
 The chess board shall be square an take the full width of the screen. On the top shall be a status indication which states if the program is still connected to the MQTT Broker. 
 
-Below the chess board the 3 buttons are placed in the order: Wechsel, Zurück, Neu starten
+Below the chess board, the 3 buttons are placed in the order: Wechsel, Zurück, Neu starten
 
 
 
