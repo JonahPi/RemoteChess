@@ -8,6 +8,9 @@
     <meta name="theme-color" content="#1a1a1a">
     <title>Remote Chess</title>
     <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols+2&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -142,6 +145,7 @@
             justify-content: center;
             font-weight: bold;
             font-size: 36px;
+            font-family: 'Noto Sans Symbols 2', 'Chess Merida', sans-serif;
         }
 
         .piece.black {
@@ -358,26 +362,26 @@
                 };
                 document.getElementById('undo-btn').disabled = false;
 
-                // Check if same location (pawn-to-queen conversion)
+                // Check if same location (pawn-to-queen conversion only on rows 1 and 8)
                 if (selectedSquare.row === row && selectedSquare.col === col) {
                     const piece = board[row][col];
                     const coordKey = `${row},${col}`;
-                    // White pawn to white queen
-                    if (piece === '♙') {
+                    // White pawn to white queen (only on row 8, which is array index 0)
+                    if (piece === '♙' && row === 0) {
                         board[row][col] = '♕';
                         promotedQueens.add(coordKey);
                         addLog('White pawn promoted to queen', 'info');
-                    } else if (piece === '♕' && promotedQueens.has(coordKey)) {
+                    } else if (piece === '♕' && row === 0 && promotedQueens.has(coordKey)) {
                         board[row][col] = '♙';
                         promotedQueens.delete(coordKey);
                         addLog('White queen demoted to pawn', 'info');
                     }
-                    // Black pawn to black queen
-                    else if (piece === '♟') {
+                    // Black pawn to black queen (only on row 1, which is array index 7)
+                    else if (piece === '♟' && row === 7) {
                         board[row][col] = '♛';
                         promotedQueens.add(coordKey);
                         addLog('Black pawn promoted to queen', 'info');
-                    } else if (piece === '♛' && promotedQueens.has(coordKey)) {
+                    } else if (piece === '♛' && row === 7 && promotedQueens.has(coordKey)) {
                         board[row][col] = '♟';
                         promotedQueens.delete(coordKey);
                         addLog('Black queen demoted to pawn', 'info');
@@ -576,26 +580,26 @@
                         capturedPiece: board[toRow][toCol]
                     };
 
-                    // Check if same location (pawn-to-queen conversion)
+                    // Check if same location (pawn-to-queen conversion only on rows 1 and 8)
                     if (externalLiftCoord === coord) {
                         const piece = board[fromRow][fromCol];
                         const coordKey = `${fromRow},${fromCol}`;
-                        // White pawn to white queen
-                        if (piece === '♙') {
+                        // White pawn to white queen (only on row 8, which is array index 0)
+                        if (piece === '♙' && fromRow === 0) {
                             board[fromRow][fromCol] = '♕';
                             promotedQueens.add(coordKey);
                             addLog('External: White pawn promoted to queen', 'info');
-                        } else if (piece === '♕' && promotedQueens.has(coordKey)) {
+                        } else if (piece === '♕' && fromRow === 0 && promotedQueens.has(coordKey)) {
                             board[fromRow][fromCol] = '♙';
                             promotedQueens.delete(coordKey);
                             addLog('External: White queen demoted to pawn', 'info');
                         }
-                        // Black pawn to black queen
-                        else if (piece === '♟') {
+                        // Black pawn to black queen (only on row 1, which is array index 7)
+                        else if (piece === '♟' && fromRow === 7) {
                             board[fromRow][fromCol] = '♛';
                             promotedQueens.add(coordKey);
                             addLog('External: Black pawn promoted to queen', 'info');
-                        } else if (piece === '♛' && promotedQueens.has(coordKey)) {
+                        } else if (piece === '♛' && fromRow === 7 && promotedQueens.has(coordKey)) {
                             board[fromRow][fromCol] = '♟';
                             promotedQueens.delete(coordKey);
                             addLog('External: Black queen demoted to pawn', 'info');
