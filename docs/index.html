@@ -270,6 +270,7 @@
         let fadingTimer = null;
         let lastMove = null; // { fromRow, fromCol, toRow, toCol, movedPiece, capturedPiece }
         let boardFlipped = false;
+        let promotedQueens = new Set(); // Track queens that were promoted from pawns
 
         // Initialize board UI
         function initBoard() {
@@ -357,9 +358,35 @@
                 };
                 document.getElementById('undo-btn').disabled = false;
 
-                // Update board
-                board[row][col] = board[selectedSquare.row][selectedSquare.col];
-                board[selectedSquare.row][selectedSquare.col] = '';
+                // Check if same location (pawn-to-queen conversion)
+                if (selectedSquare.row === row && selectedSquare.col === col) {
+                    const piece = board[row][col];
+                    const coordKey = `${row},${col}`;
+                    // White pawn to white queen
+                    if (piece === '♙') {
+                        board[row][col] = '♕';
+                        promotedQueens.add(coordKey);
+                        addLog('White pawn promoted to queen', 'info');
+                    } else if (piece === '♕' && promotedQueens.has(coordKey)) {
+                        board[row][col] = '♙';
+                        promotedQueens.delete(coordKey);
+                        addLog('White queen demoted to pawn', 'info');
+                    }
+                    // Black pawn to black queen
+                    else if (piece === '♟') {
+                        board[row][col] = '♛';
+                        promotedQueens.add(coordKey);
+                        addLog('Black pawn promoted to queen', 'info');
+                    } else if (piece === '♛' && promotedQueens.has(coordKey)) {
+                        board[row][col] = '♟';
+                        promotedQueens.delete(coordKey);
+                        addLog('Black queen demoted to pawn', 'info');
+                    }
+                } else {
+                    // Normal move
+                    board[row][col] = board[selectedSquare.row][selectedSquare.col];
+                    board[selectedSquare.row][selectedSquare.col] = '';
+                }
 
                 // Clear selection
                 document.querySelector(`[data-coord="${fromCoord}"]`).classList.remove('selected');
@@ -483,6 +510,25 @@
         function handleMQTTMessage(message) {
             addLog('Received: ' + message, 'received');
 
+            // Handle undo message
+            if (message === 'undo') {
+                const isLocalMessage = sentMessages.has(message);
+                if (isLocalMessage) {
+                    sentMessages.delete(message);
+                    return; // Don't process our own undo
+                }
+                // Undo last move from external source
+                if (lastMove) {
+                    board[lastMove.fromRow][lastMove.fromCol] = lastMove.movedPiece;
+                    board[lastMove.toRow][lastMove.toCol] = lastMove.capturedPiece;
+                    clearAllLEDs();
+                    updateBoardUI();
+                    lastMove = null;
+                    addLog('External undo received', 'info');
+                }
+                return;
+            }
+
             if (message.length < 4) return;
 
             const coord = message.substring(0, message.length - 2);
@@ -520,8 +566,45 @@
                     const toCol = coord.charCodeAt(0) - 65;
                     const toRow = 8 - parseInt(coord.charAt(1));
 
-                    board[toRow][toCol] = board[fromRow][fromCol];
-                    board[fromRow][fromCol] = '';
+                    // Save for potential undo
+                    lastMove = {
+                        fromRow: fromRow,
+                        fromCol: fromCol,
+                        toRow: toRow,
+                        toCol: toCol,
+                        movedPiece: board[fromRow][fromCol],
+                        capturedPiece: board[toRow][toCol]
+                    };
+
+                    // Check if same location (pawn-to-queen conversion)
+                    if (externalLiftCoord === coord) {
+                        const piece = board[fromRow][fromCol];
+                        const coordKey = `${fromRow},${fromCol}`;
+                        // White pawn to white queen
+                        if (piece === '♙') {
+                            board[fromRow][fromCol] = '♕';
+                            promotedQueens.add(coordKey);
+                            addLog('External: White pawn promoted to queen', 'info');
+                        } else if (piece === '♕' && promotedQueens.has(coordKey)) {
+                            board[fromRow][fromCol] = '♙';
+                            promotedQueens.delete(coordKey);
+                            addLog('External: White queen demoted to pawn', 'info');
+                        }
+                        // Black pawn to black queen
+                        else if (piece === '♟') {
+                            board[fromRow][fromCol] = '♛';
+                            promotedQueens.add(coordKey);
+                            addLog('External: Black pawn promoted to queen', 'info');
+                        } else if (piece === '♛' && promotedQueens.has(coordKey)) {
+                            board[fromRow][fromCol] = '♟';
+                            promotedQueens.delete(coordKey);
+                            addLog('External: Black queen demoted to pawn', 'info');
+                        }
+                    } else {
+                        // Normal move
+                        board[toRow][toCol] = board[fromRow][fromCol];
+                        board[fromRow][fromCol] = '';
+                    }
                     updateBoardUI();
                     externalLiftCoord = null;
                 }
@@ -563,6 +646,7 @@
             selectedSquare = null;
             externalLiftCoord = null;
             lastMove = null;
+            promotedQueens.clear();
             document.getElementById('undo-btn').disabled = true;
             updateBoardUI();
             clearAllLEDs();
@@ -589,6 +673,9 @@
             // Disable undo button (only works for one move)
             lastMove = null;
             document.getElementById('undo-btn').disabled = true;
+
+            // Send undo message to MQTT
+            publishMove('undo');
 
             addLog('Move undone', 'info');
         }
