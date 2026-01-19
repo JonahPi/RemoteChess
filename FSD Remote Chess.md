@@ -86,11 +86,15 @@ The Web App allows the simulation of the real chess board. So one player can use
 
 The Web App shall be hosted as page in the Git-repository for this project ([Remote Chess](https://jonahpi.github.io/RemoteChess/)). The Web App shall simulate the Chess-board and shall be optimized for an iPhone 16 from the layout. By touching a figure ones it is activated for moving. Touching a field afterwards will place the figure there. In case the destination field was not empty, the destination figure is replaced with the figure which has been selected. When moving the figures no chess rules need to be considered. Touching the figure shall have the same effect as lifting a figure on the real chess box including the MQTT message. The LEDs shall be simulated by small dots on the simulated chess field. 
 
+When starting the program it shall automatically try to connect, when it gets disconnected it shall try to reconnect.
+
 A button called "Zurück" allows to undo the latest action on App. It will move the figures which has been moved by the user back to the last position, the LEDs are switched off and in case another figure has been killed, the figure should be replaced to its original position. "Zurück" only needs to work for one move. the button shall be greyed out when it has been used and re-activated after the next move.
 
+A button called "Neu starten" will reset the board to the start position. White is on the bottom, black on the top.
+
+A button called "Wechsel" shall flip the entire board updside down, so that the player sees the black figures on the bottom and the white figures on the top. Pressing the button again, switches back to the original setup with white figures on the bottom and black on the top.
+
 When the App receives a MQTT message of type *coordinate*-L which has not been triggered by touching a figure in the app itself, this means that the other player has lifted a figure. The App shall then wait for the message that a figure has been placed (*coordinate*-P) and move the corresponding icon from the lift-corrdinates to the place-coordinates.
-
-
 
 ### Icon Design
 
@@ -104,7 +108,9 @@ When the App receives a MQTT message of type *coordinate*-L which has not been t
 
 ### Screen Layout
 
-The chess board shall be square an take the full width of the screen. On the top shall be a status indication which states if the program is still connected to the MQTT Broker. On disconnect or on start of the program it shall automatically try to connect.
+The chess board shall be square an take the full width of the screen. On the top shall be a status indication which states if the program is still connected to the MQTT Broker. 
 
-A button below the chess board states "Neu starten" it will reset the board to the start position. White is on the bottom, black on the top.
+Below the chess board the 3 buttons are placed in the order: Wechsel, Zurück, Neu starten
+
+
 

@@ -173,6 +173,14 @@
             cursor: pointer;
         }
 
+        #flip-btn {
+            background: #6600cc;
+        }
+
+        #flip-btn:active {
+            background: #5200a3;
+        }
+
         #undo-btn {
             background: #cc6600;
         }
@@ -207,6 +215,7 @@
         </div>
 
         <div id="controls">
+            <button id="flip-btn">Wechsel</button>
             <button id="undo-btn" disabled>Zurück</button>
             <button id="reset-btn">Neu starten</button>
         </div>
@@ -260,18 +269,24 @@
         let externalLiftCoord = null;
         let fadingTimer = null;
         let lastMove = null; // { fromRow, fromCol, toRow, toCol, movedPiece, capturedPiece }
+        let boardFlipped = false;
 
         // Initialize board UI
         function initBoard() {
             const boardEl = document.getElementById('board');
             boardEl.innerHTML = '';
 
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
+            for (let displayRow = 0; displayRow < 8; displayRow++) {
+                for (let displayCol = 0; displayCol < 8; displayCol++) {
+                    // When flipped, reverse both row and column order
+                    const row = boardFlipped ? (7 - displayRow) : displayRow;
+                    const col = boardFlipped ? (7 - displayCol) : displayCol;
+
                     const square = document.createElement('div');
                     const coord = String.fromCharCode(65 + col) + (8 - row);
-                    
-                    square.className = 'square ' + ((row + col) % 2 === 0 ? 'light' : 'dark');
+
+                    // Use display position for coloring (keeps board pattern consistent)
+                    square.className = 'square ' + ((displayRow + displayCol) % 2 === 0 ? 'light' : 'dark');
                     square.dataset.row = row;
                     square.dataset.col = col;
                     square.dataset.coord = coord;
@@ -296,6 +311,20 @@
                     boardEl.appendChild(square);
                 }
             }
+
+            // Restore LED states after re-rendering
+            Object.keys(ledStates).forEach(coord => {
+                const state = ledStates[coord];
+                if (state.color) {
+                    const led = document.querySelector(`.led-indicator[data-coord="${coord}"]`);
+                    if (led) {
+                        led.classList.add(state.color);
+                        if (state.blink) {
+                            led.classList.add('blink');
+                        }
+                    }
+                }
+            });
         }
 
         // Handle square click
@@ -564,7 +593,19 @@
             addLog('Move undone', 'info');
         }
 
+        function flipBoard() {
+            boardFlipped = !boardFlipped;
+            // Clear selection when flipping
+            if (selectedSquare) {
+                document.querySelector(`[data-coord="${selectedSquare.coord}"]`)?.classList.remove('selected');
+                selectedSquare = null;
+            }
+            initBoard();
+            addLog('Board flipped: ' + (boardFlipped ? 'black on bottom' : 'white on bottom'), 'info');
+        }
+
         // Event listeners
+        document.getElementById('flip-btn').addEventListener('click', flipBoard);
         document.getElementById('undo-btn').addEventListener('click', undoMove);
         document.getElementById('reset-btn').addEventListener('click', resetBoard);
 
