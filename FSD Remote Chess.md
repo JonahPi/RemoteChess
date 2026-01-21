@@ -96,7 +96,7 @@ A button called "Wechsel" shall flip the entire board updside down, so that the 
 
 When the App receives a MQTT message of type *coordinate*-L which has not been triggered by touching a figure in the app itself, this means that the other player has lifted a figure. The App shall then wait for the message that a figure has been placed (*coordinate*-P) and move the corresponding icon from the lift-coordinates to the place-coordinates.
 
-When the lift location and the place location of a pawn is the same, change the pawn to a Queen, if it is lifted and placed again to the same location, change it back to a pawn. All other figures, shall remain the same when they are lifted and placed on the same location.
+When the lift location and the place location of a pawn is the same and the pawn is in row 1 or in row 8, change the pawn to a Queen, if it is lifted and placed again to the same location, change it back to a pawn. All other figures and pawns in all other rows, shall remain the same when they are lifted and placed on the same location.
 
 
 

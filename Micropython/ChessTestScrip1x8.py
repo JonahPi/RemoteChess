@@ -6,12 +6,12 @@ import time
 frequency = 500  # Configurable frequency in ms for RGB test sequence
 BRIGHTNESS = 0.4  # 40% brightness for hall-sensor test
 
-# I2C-Setup für MCP23017 (SCL=D5, SDA=D4)
-i2c = I2C(0, scl=Pin(5), sda=Pin(4), freq=100000)
+# I2C-Setup für MCP23017 (SCL=D5=GPIO23, SDA=D4=GPIO22)
+i2c = I2C(0, scl=Pin(23), sda=Pin(22), freq=100000)
 
-# Neopixel-Setup (8 LEDs auf Pin D7)
+# Neopixel-Setup (8 LEDs auf Pin D10=GPIO18)
 NUM_PIXELS = 8
-np = neopixel.NeoPixel(Pin(7), NUM_PIXELS)
+np = neopixel.NeoPixel(Pin(18), NUM_PIXELS)
 
 # MCP23017 Register addresses
 IODIRA = 0x00  # I/O Direction Register für Port A

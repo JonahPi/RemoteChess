@@ -28,9 +28,9 @@ FADING_TIMEOUT_MS = 20000     # 20 seconds
 BLINK_FREQUENCY_MS = 200      # 200ms for blinking
 
 # Pin Configuration (Xiao ESP32-C6)
-PIN_SDA = 4  # D4
-PIN_SCL = 5  # D5
-PIN_NEOPIXEL = 7  # D7
+PIN_SDA = 22  # D4 = GPIO22
+PIN_SCL = 23  # D5 = GPIO23
+PIN_NEOPIXEL = 18  # D10 = GPIO18
 
 # Board Configuration
 NUM_NEOPIXELS = 64
