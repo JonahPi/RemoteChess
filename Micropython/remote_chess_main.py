@@ -12,7 +12,7 @@ import secrets
 
 # ============= CONFIGURATION =============
 # Demo Mode - Set to True to run without hall sensors
-DEMO_MODE = True  # Set to True for testing without hardware
+DEMO_MODE = False  # Set to True for testing without hardware
 
 # MQTT Topic
 MQTT_TOPIC = b"home/chess"
@@ -26,6 +26,10 @@ COLOR_OFF = (0, 0, 0)         # Off
 # Timing
 FADING_TIMEOUT_MS = 20000     # 20 seconds
 BLINK_FREQUENCY_MS = 200      # 200ms for blinking
+STARTUP_ROW_DURATION_MS = 800  # 800ms per row during startup
+
+# Startup brightness (40% = 0.4)
+STARTUP_BRIGHTNESS = 0.4
 
 # Pin Configuration (Xiao ESP32-C6)
 PIN_SDA = 22  # D4 = GPIO22
@@ -67,17 +71,28 @@ def mcp23017_read_gpio(i2c, address):
     return data[0]
 
 # ============= Coordinate Conversion =============
-def sensor_to_coordinate(row, col):
-    """Convert row (0-7) and column (0-7) to chess coordinate (e.g., 'A1')"""
+def sensor_to_coordinate(row_idx, col):
+    """Convert row_idx (0-7) and column (0-7) to chess coordinate.
+
+    Note: I2C addresses are mapped as follows:
+    - row_idx 0 (I2C 0x20) = Chess Row 8
+    - row_idx 7 (I2C 0x27) = Chess Row 1
+    """
     column_letter = chr(ord('A') + col)
-    row_number = row + 1
+    row_number = 8 - row_idx  # row_idx 0 -> row 8, row_idx 7 -> row 1
     return f"{column_letter}{row_number}"
 
 def coordinate_to_neopixel(coord):
-    """Convert chess coordinate (e.g., 'A1') to neopixel index (0-63)"""
+    """Convert chess coordinate (e.g., 'A1') to neopixel index (0-63).
+
+    Note: Neopixels are counted from A8 (index 0) to H1 (index 63).
+    - A8 = 0, H8 = 7
+    - A1 = 56, H1 = 63
+    """
     col = ord(coord[0]) - ord('A')
-    row = int(coord[1]) - 1
-    return row * 8 + col
+    chess_row = int(coord[1])
+    row_idx = 8 - chess_row  # row 8 -> idx 0, row 1 -> idx 7
+    return row_idx * 8 + col
 
 # ============= NeoPixel Functions =============
 def set_neopixel(coord, color):
@@ -124,14 +139,44 @@ def fading_callback(timer):
 # ============= MQTT Functions =============
 def mqtt_callback(topic, msg):
     """Handle incoming MQTT messages"""
-    global LML, LMP, LMK, fading_timer, blink_timer
-    
+    global LML, LMP, LMK, fading_timer, blink_timer, previous_hall_states
+
     message = msg.decode('utf-8')
     print(f"Received: {message}")
-    
+
+    # Handle restart message
+    if message == "restart":
+        global FigureInAir
+        print("Restart triggered - running startup sequence")
+        # Clear all state
+        LML = ""
+        LMP = ""
+        LMK = ""
+        FigureInAir = False
+        if fading_timer:
+            fading_timer.deinit()
+        if blink_timer:
+            blink_timer.deinit()
+        # Clear all LEDs
+        for i in range(NUM_NEOPIXELS):
+            np[i] = COLOR_OFF
+        np.write()
+        # Run startup sequence and re-read hall sensor states
+        if not DEMO_MODE:
+            startup_led_test()
+            # Re-initialize hall sensor states after restart
+            for row_idx, address in enumerate(MCP23017_ADDRESSES):
+                try:
+                    gpio_state = mcp23017_read_gpio(i2c, address)
+                    for col_idx in range(8):
+                        previous_hall_states[row_idx][col_idx] = (gpio_state & (1 << col_idx)) == 0
+                except Exception as e:
+                    print(f"Error reading state after restart: {e}")
+        return
+
     if len(message) < 4:
         return
-    
+
     coord = message[:-2]  # Extract coordinate (e.g., 'A4' from 'A4-L')
     action = message[-1]  # Extract action ('L', 'P', or 'X')
     
@@ -185,44 +230,107 @@ def publish_move(message):
 
 # ============= Hall Sensor Scanning =============
 def scan_hall_sensors():
-    """Scan all hall sensors and detect changes"""
+    """Scan all hall sensors and detect changes.
+
+    When LEDs indicate a move from the other player (LML/LMP set),
+    synchronizing figures to follow that move does NOT trigger MQTT messages.
+    """
     global FigureInAir, LML, LMP, LMK, previous_hall_states
-    
+
     for row_idx, address in enumerate(MCP23017_ADDRESSES):
         try:
             gpio_state = mcp23017_read_gpio(i2c, address)
-            
+
             for col_idx in range(8):
-                # Check if bit is set (sensor active = figure present)
-                current_state = bool(gpio_state & (1 << col_idx))
+                # Check if bit is LOW (0 = magnet detected = figure present, with pull-ups)
+                current_state = (gpio_state & (1 << col_idx)) == 0
                 previous_state = previous_hall_states[row_idx][col_idx]
-                
+
                 # Detect state change
                 if current_state != previous_state:
                     coord = sensor_to_coordinate(row_idx, col_idx)
-                    
-                    # Figure removed (ON to OFF)
+
+                    # Figure removed (was present, now absent)
                     if previous_state and not current_state:
-                        if not FigureInAir:
-                            # Regular lift
-                            LML = coord
+                        # Check if this is synchronizing to an indicated move (lift from LML)
+                        if coord == LML:
+                            # Player is following indicated move - don't publish
+                            # Turn off the red LED and clear LML
+                            print(f"Sync lift at {coord} (following indicated move)")
+                            set_neopixel(LML, COLOR_OFF)
+                            LML = ""
+                        elif coord == LMP:
+                            # Player is removing killed piece from destination - no action
+                            # Green LED stays on until new piece is placed
+                            print(f"Sync kill removal at {coord} (removing captured piece)")
+                        elif not FigureInAir:
+                            # Regular lift - publish
                             FigureInAir = True
                             publish_move(f"{coord}-L")
                         else:
-                            # Killed piece
-                            LMK = coord
+                            # Killed piece - publish
                             publish_move(f"{coord}-X")
-                    
-                    # Figure placed (OFF to ON)
+
+                    # Figure placed (was absent, now present)
                     elif not previous_state and current_state:
-                        LMP = coord
-                        FigureInAir = False
-                        publish_move(f"{coord}-P")
-                    
+                        # Check if this is synchronizing to an indicated move (place at LMP)
+                        if coord == LMP:
+                            # Player is following indicated move - don't publish
+                            # Turn off the green LED and clear LMP
+                            print(f"Sync place at {coord} (following indicated move)")
+                            set_neopixel(LMP, COLOR_OFF)
+                            LMP = ""
+                        else:
+                            # Regular place - publish
+                            FigureInAir = False
+                            publish_move(f"{coord}-P")
+
                     previous_hall_states[row_idx][col_idx] = current_state
-        
+
         except Exception as e:
             print(f"Error reading MCP23017 at 0x{address:02X}: {e}")
+
+# ============= Startup Routine =============
+def startup_led_test():
+    """Display hall sensor status row by row during startup"""
+    print("Running startup LED test...")
+
+    # Calculate dimmed colors (40% brightness)
+    color_red = tuple(int(c * STARTUP_BRIGHTNESS) for c in COLOR_LIFT)
+    color_green = tuple(int(c * STARTUP_BRIGHTNESS) for c in COLOR_PLACE)
+
+    for row_idx, address in enumerate(MCP23017_ADDRESSES):
+        try:
+            # Read hall sensor state for this row
+            gpio_state = mcp23017_read_gpio(i2c, address)
+
+            # Light up LEDs for this row
+            for col_idx in range(8):
+                # Check if magnet detected (LOW = magnet present)
+                magnet_present = (gpio_state & (1 << col_idx)) == 0
+                led_idx = row_idx * 8 + col_idx
+
+                if magnet_present:
+                    np[led_idx] = color_red    # Red for magnet/figure present
+                else:
+                    np[led_idx] = color_green  # Green for no magnet/empty
+
+            np.write()
+            print(f"Row {row_idx + 1} (0x{address:02X}): displayed")
+
+            # Wait 1 second
+            time.sleep(STARTUP_ROW_DURATION_MS / 1000)
+
+            # Turn off this row before next
+            for col_idx in range(8):
+                led_idx = row_idx * 8 + col_idx
+                np[led_idx] = COLOR_OFF
+            np.write()
+
+        except Exception as e:
+            print(f"Error in startup test row {row_idx + 1}: {e}")
+
+    print("Startup LED test complete")
 
 # ============= WiFi Connection =============
 def connect_wifi():
@@ -274,7 +382,11 @@ def main():
     for i in range(NUM_NEOPIXELS):
         np[i] = COLOR_OFF
     np.write()
-    
+
+    # Run startup LED test (only if not in demo mode)
+    if not DEMO_MODE:
+        startup_led_test()
+
     # Connect to WiFi
     connect_wifi()
     
@@ -312,7 +424,8 @@ def main():
             try:
                 gpio_state = mcp23017_read_gpio(i2c, address)
                 for col_idx in range(8):
-                    previous_hall_states[row_idx][col_idx] = bool(gpio_state & (1 << col_idx))
+                    # LOW (0) = magnet detected = figure present (with pull-ups)
+                    previous_hall_states[row_idx][col_idx] = (gpio_state & (1 << col_idx)) == 0
             except Exception as e:
                 print(f"Error reading initial state: {e}")
     

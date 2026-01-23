@@ -10,7 +10,11 @@ The board has 8 times 8 fields setup in columns A to H and rows 1 to 8. Each fie
 
 The 64 Neopixel are organized in 8 rows so Fields A1 to H1 have the Neopixel numbers 1 to 8, the fields A2 to H2 have the Neopixel numbers 9 to 18 and so on till the fields A8 to H8 with Neopixel numbers 56 to 64.
 
-The status of 64 hall sensors is detected by 8 PCBs, each of which has a MCP23017 GPIO Board Expander and 8 hall sensors to cover 1 row on the board. The 8 boards are all connected to an I2C bus. The board for the first row has the I2C address 0x20, the board for the second row has the address 0x21 and so on till the last row with board-address 0x27. The hall - sensors are connected to the  Inputs GPA0 to GPA7 of the Board expander, GPA0 corresponds to column A, GPA7 corresponds to column 7.
+The status of 64 hall sensors is detected by 8 PCBs, each of which has a MCP23017 GPIO Board Expander and 8 hall sensors to cover 1 row on the board. The 8 boards are all connected to an I2C bus. The board for the first row has the I2C address 0x27, the board for the second row has the address 0x26 and so on till the last row with board-address 0x20. The hall - sensors are connected to the  Inputs GPA0 to GPA7 of the Board expander, GPA0 corresponds to column A, GPA7 corresponds to column 7. 
+
+##### Note: 
+
+The ESP32 is located near the last row and the Neopixels are counted from there, this means that Fiel A8 (I2C address 0x20, GPA0) corresponds to the first Neopixel. Field H8 (I2C 0x27, GPA7) corresponds to the last Neopixel.
 
 #### Module test
 
@@ -24,16 +28,33 @@ The test program has 3 steps:
 
 ## ESP-Programming
 
+### Program startup
+
+During program startup, after initializing the hardware and before entering the main loop, the board shall perform a visual self-test by displaying the hall sensor status row by row:
+
+1. For each row (1 to 8), read the hall sensor states and light up the corresponding LEDs for 1 second:
+   - Fields with a magnet detected (figure present): RED
+   - Fields without a magnet (no figure): GREEN
+2. LED brightness during this startup routine shall be limited to 40%
+3. After displaying a row for 1 second, turn off all LEDs before proceeding to the next row
+4. After all 8 rows have been displayed, turn off all LEDs and proceed to the main loop
+
+This startup sequence serves as a visual confirmation that all hall sensors and LEDs are functioning correctly. 
+
+The startup sequence shall also be called when a re-start is triggered.
+
 ### Detecting and publishing movement
 
 When initializing the program, the following 4 states should be safed:
 LastMoveLift: LML="", LastMovePlace: LMP="", LastMoveKilled: LMK="", FigureInAir = *false*,
 
-If a hall-sensor changes the status from on (figure on field) to off (figure removed from field) and the status FigureInAir is equal to false, the action shall be to translate the sensor number to the correct field coordinate, upate LML  with the corresponding coordinate (e.g. LML = A4), set FigureInAir to true and publish the topic: *coordinate*-L (e.g. "A4-L" for a figure on field A4 which has been lifted in the air)
+If a hall-sensor changes the status from on (figure on field) to off (figure removed from field) and the status FigureInAir is equal to false, the action shall be to translate the sensor number to the correct field coordinate, set FigureInAir to true and publish the topic: *coordinate*-L (e.g. "A4-L" for a figure on field A4 which has been lifted in the air)
 
-When the hall-sensor changes from *off* to *on*, the corresponding coordinate shall be stored in LMP (e.g. "B5"), the boolean FigureInAir shall be set to *false* and the message "*coordinate*-P" shall be published
+When the hall-sensor changes from *off* to *on*, the boolean FigureInAir shall be set to *false* and the message "*coordinate*-P" shall be published
 
-If a hall status changes from on to off and FigureInAir is equal to *true* then the  coordinate shall be stored in status LMK and the topic "*coordinate*-X" shall be published.
+If a hall status changes from on to off and FigureInAir is equal to *true* then the topic "*coordinate*-X" shall be published.
+
+**Important:** The state variables LML, LMP and LMK shall only be updated by the MQTT callback when receiving messages, not by the hall sensor scanning function. This ensures that when the board receives its own published message, the LED control works correctly (the callback clears the OLD coordinates before setting the new ones). The hall sensor scanning function shall only update FigureInAir and publish MQTT messages.
 
 ### Receiving and Indicating movement
 
@@ -46,6 +67,10 @@ New messages on topic /remotechess shall trigger the following actions:
 | *coordinate*-X | 1. switch the neopixel corresponding to *coordinate* to red blinking (200ms frequency)<br />2. set value of LMX to *coordinate* |
 
 When the timer fading expires, the Neopixels corresponding to the coordinates stored in LMP, LML and LMX shall be switched to *off* and all LEDs shall be switched to off.
+
+### Moving figures to follow indicated movement
+
+When the player receives a move which is indicated by the red and green LEDs, he is supposed to synchronize the figures on the chess field with the indicated move. This synchronization shall not trigger a MQTT message. As soon as he lifts the figure to be synchronized from the correct position, the red led shall be switched off, when he places the figure on the correct field the green LED shall be switched off. It is important that the "on"->"off" sequence (figure is lifted) and the "off"->"on" sequence (figure is placed) are correctly detected. In case a figure is killed in that move, the destination hall-sensor is "on" in the beginning. The figure to be killed is then lifted (on->off: which should not cause any action) and the new figure is placed (off->on: switching off green destination LED).
 
 ### Pin-assignment
 
@@ -90,7 +115,7 @@ When starting the program it shall automatically try to connect, when it gets di
 
 A button called "Zurück" allows to undo the latest action on App. It will move the figures which has been moved by the user back to the last position, the LEDs are switched off and in case another figure has been killed, the figure should be replaced to its original position. "Zurück" only needs to work for one move. the button shall be greyed out when it has been used and re-activated after the next move. When "Zurück" has been clicked, send the message "undo" to the MQTT topic. When receiving the MQTT message "undo", undo the last figure placement.
 
-A button called "Neu starten" will reset the board to the start position. White is on the bottom, black on the top.
+A button called "Neu starten" will reset the board to the start position. White is on the bottom, black on the top. This will also trigger the startup-sequence and a MQTT message "restart". The MQTT message indicates the other player that the game has restarted. When the ESP32 receives the "restart" message, the startup-sequence shall be triggered.
 
 A button called "Wechsel" shall flip the entire board updside down, so that the player sees the black figures on the bottom and the white figures on the top. Pressing the button again, switches back to the original setup with white figures on the bottom and black on the top.
 

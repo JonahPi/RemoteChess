@@ -514,6 +514,26 @@
         function handleMQTTMessage(message) {
             addLog('Received: ' + message, 'received');
 
+            // Handle restart message
+            if (message === 'restart') {
+                const isLocalMessage = sentMessages.has(message);
+                if (isLocalMessage) {
+                    sentMessages.delete(message);
+                    return; // Don't process our own restart
+                }
+                // Reset board from external source
+                board = JSON.parse(JSON.stringify(INITIAL_BOARD));
+                selectedSquare = null;
+                externalLiftCoord = null;
+                lastMove = null;
+                promotedQueens.clear();
+                document.getElementById('undo-btn').disabled = true;
+                initBoard();
+                clearAllLEDs();
+                addLog('External restart received', 'info');
+                return;
+            }
+
             // Handle undo message
             if (message === 'undo') {
                 const isLocalMessage = sentMessages.has(message);
@@ -652,9 +672,11 @@
             lastMove = null;
             promotedQueens.clear();
             document.getElementById('undo-btn').disabled = true;
-            updateBoardUI();
+            initBoard();
             clearAllLEDs();
             addLog('Board reset', 'info');
+            // Send restart message to MQTT
+            publishMove('restart');
             // Try to reconnect if not connected
             if (!isConnected) {
                 connectMQTT();
