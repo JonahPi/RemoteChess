@@ -489,16 +489,16 @@
                         mqttClient.subscribe(topic);
                         addLog('Subscribed to ' + topic, 'success');
 
-                        // Show connection indication: D4, E4 green and D3, E3 red for 1 second
+                        // Show connection indication: D4, E4 green and D5, E5 red for 1 second
                         updateLED('D4', 'green', false);
                         updateLED('E4', 'green', false);
-                        updateLED('D3', 'red', false);
-                        updateLED('E3', 'red', false);
+                        updateLED('D5', 'red', false);
+                        updateLED('E5', 'red', false);
                         setTimeout(() => {
                             updateLED('D4', null, false);
                             updateLED('E4', null, false);
-                            updateLED('D3', null, false);
-                            updateLED('E3', null, false);
+                            updateLED('D5', null, false);
+                            updateLED('E5', null, false);
                         }, 1000);
                     },
                     onFailure: (error) => {

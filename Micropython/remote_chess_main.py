@@ -459,16 +459,16 @@ def main():
         mqtt_client.subscribe(MQTT_TOPIC)
         print(f"MQTT connected and subscribed to {MQTT_TOPIC.decode()}")
 
-        # Show connection indication: D4, E4 green and D3, E3 red for 1 second
+        # Show connection indication: D4, E4 green and D5, E5 red for 1 second
         set_neopixel("D4", COLOR_PLACE)
         set_neopixel("E4", COLOR_PLACE)
-        set_neopixel("D3", COLOR_LIFT)
-        set_neopixel("E3", COLOR_LIFT)
+        set_neopixel("D5", COLOR_LIFT)
+        set_neopixel("E5", COLOR_LIFT)
         time.sleep(1)
         set_neopixel("D4", COLOR_OFF)
         set_neopixel("E4", COLOR_OFF)
-        set_neopixel("D3", COLOR_OFF)
-        set_neopixel("E3", COLOR_OFF)
+        set_neopixel("D5", COLOR_OFF)
+        set_neopixel("E5", COLOR_OFF)
         print("Ready to play!")
     except Exception as e:
         print(f"MQTT connection failed: {e}")
