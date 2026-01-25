@@ -45,10 +45,6 @@ The startup sequence shall also be called when a re-start is triggered.
 
 ### Detecting and publishing movement
 
-c1,c2=coordinates of first/second figure, hs() =Hall-sensor statu,  FIA=Number of Figures In The Air, l()=LED status, m: MQTT message
-
-
-
 ```
 @startuml
 
@@ -58,19 +54,28 @@ state "3: hs(c2)=ON, FIA=0" as state3
 state "4: hs(c2)=OFF, FIA=2" as state4
 state "re-start" as restart
 
-state1 --> state2 : h(c1)=off / l(c1)=red,m:"c1-L"
-state2 --> state3 : h(c2)=on / l(c2)=green,m:"c2-P"
-state2 --> state4 : h(c2)=off / l(c2)=red,m:"c2-L"
-state4 --> restart : h(c1)=on / l(c1)=blink,m:"c1-X"
-state4 --> restart : h(c2)=on / l(c2)=blink,m:"c2-X"
-state2 --> restart : h(c1)=on / l(c1)=off,m:"c1-P"
-state3 --> restart 
+state1 --> state2 : hs(c1)=off / l(c1)=red,m:"c1-L"
+state2 --> state3 : hs(c2)=on / l(c2)=green,m:"c2-P"
+state2 --> state4 : hs(c2)=off / l(c2)=red,m:"c2-L"
+state4 --> restart : hs(c1)=on / l(c1)=blink,m:"c1-X"
+state4 --> restart : hs(c2)=on / l(c2)=blink,m:"c2-X"
+state2 --> restart : hs(c1)=on / l(c1)=off,m:"c1-P"
+state3 --> restart : [auto]
 restart --> state1 : restart
+
+legend right
+  | Symbol | Description |
+  | c1, c2 | Coordinates of first/second figure |
+  | hs()   | Hall-sensor status |
+  | FIA    | Figures In Air (counter: 0, 1, 2) |
+  | l()    | LED status |
+  | m      | MQTT message |
+endlegend
 
 @enduml
 ```
 
-**Important:** The state variables LML, LMP and LMK shall only be updated by the MQTT callback when receiving messages, not by the hall sensor scanning function. This ensures that when the board receives its own published message, the LED control works correctly (the callback clears the OLD coordinates before setting the new ones). The hall sensor scanning function shall only update FigureInAir and publish MQTT messages.
+**Important:** The state variables LML, LMP and LMK shall only be updated by the MQTT callback when receiving messages, not by the hall sensor scanning function. This ensures that when the board receives its own published message, the LED control works correctly (the callback clears the OLD coordinates before setting the new ones). The hall sensor scanning function shall only update FiguresInAir and publish MQTT messages.
 
 ### Receiving and Indicating movement
 
@@ -78,11 +83,11 @@ New messages on topic /remotechess shall trigger the following actions:
 
 | Message format | Action                                                       |
 | -------------- | ------------------------------------------------------------ |
-| *coordinate*-L | 1. switch the Neopixel correesponding to *coordinate* to red<br />2. set neopixels corresponding to coordinate stored in LML, LMP and LMX to *off* (skip the neopixel if the variable is empty)<br />3. set values in LMP and LMX to ""<br />4. set value of LML to *coordinate*<br />5. stop the timer "fading" |
-| *coordinate*-P | 1. switch the neopixel correspondig to coordinate to green<br />2. reset/start the timer "fading" and set it to 20s<br />3. set value of LMP to *coordinate*<br />4. if LMX is not empty, set it to empty and stop the blinking |
-| *coordinate*-X | 1. switch the neopixel corresponding to *coordinate* to red blinking (200ms frequency)<br />2. set value of LMX to *coordinate* |
+| *coordinate*-L | 1. switch the Neopixel corresponding to *coordinate* to red<br />2. set neopixels corresponding to coordinates stored in LML, LMP and LMK to *off* (skip if the variable is empty)<br />3. set values of LMP and LMK to ""<br />4. set value of LML to *coordinate*<br />5. stop the timer "fading" |
+| *coordinate*-P | 1. switch the neopixel corresponding to *coordinate* to green<br />2. reset/start the timer "fading" and set it to 20s<br />3. set value of LMP to *coordinate*<br />4. if LMK is not empty, set it to "" and stop the blinking |
+| *coordinate*-X | 1. switch the neopixel corresponding to *coordinate* to red blinking (200ms frequency)<br />2. set value of LMK to *coordinate* |
 
-When the timer fading expires, the Neopixels corresponding to the coordinates stored in LMP, LML and LMX shall be switched to *off* and all LEDs shall be switched to off.
+When the timer fading expires, the Neopixels corresponding to the coordinates stored in LML, LMP and LMK shall be switched to *off* and all LEDs shall be switched to off.
 
 ### Moving figures to follow indicated movement
 
