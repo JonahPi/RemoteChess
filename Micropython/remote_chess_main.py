@@ -232,6 +232,11 @@ def mqtt_callback(topic, msg):
             blink_timer.deinit()
         blink_timer = Timer(1)
         blink_timer.init(mode=Timer.PERIODIC, period=BLINK_FREQUENCY_MS, callback=blink_callback)
+        # Start fading timer so blinking LED turns off after timeout
+        if fading_timer:
+            fading_timer.deinit()
+        fading_timer = Timer(0)
+        fading_timer.init(mode=Timer.ONE_SHOT, period=FADING_TIMEOUT_MS, callback=fading_callback)
 
 def publish_move(message):
     """Publish move to MQTT topic"""
