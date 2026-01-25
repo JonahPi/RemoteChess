@@ -270,7 +270,8 @@
         let isConnected = false;
         let ledStates = {};
         let sentMessages = new Set();
-        let externalLiftCoord = null;
+        let externalFirstLiftCoord = null;  // c1: First lifted piece
+        let externalSecondLiftCoord = null; // c2: Second lifted piece (capture scenario)
         let fadingTimer = null;
         let lastMove = null; // { fromRow, fromCol, toRow, toCol, movedPiece, capturedPiece }
         let boardFlipped = false;
@@ -533,7 +534,8 @@
                 // Reset board from external source
                 board = JSON.parse(JSON.stringify(INITIAL_BOARD));
                 selectedSquare = null;
-                externalLiftCoord = null;
+                externalFirstLiftCoord = null;
+                externalSecondLiftCoord = null;
                 lastMove = null;
                 promotedQueens.clear();
                 document.getElementById('undo-btn').disabled = true;
@@ -574,8 +576,22 @@
             }
 
             if (action === 'L') {
-                // Lift
-                clearAllLEDs();
+                // Lift - State 1→2 (first lift) or State 2→4 (second lift for capture)
+                if (!isLocalMessage) {
+                    if (externalFirstLiftCoord === null) {
+                        // First lift (State 1 → State 2)
+                        clearAllLEDs();
+                        externalFirstLiftCoord = coord;
+                    } else {
+                        // Second lift (State 2 → State 4, capture scenario)
+                        externalSecondLiftCoord = coord;
+                    }
+                } else {
+                    // Local message - just clear LEDs for first lift
+                    if (externalFirstLiftCoord === null) {
+                        clearAllLEDs();
+                    }
+                }
                 updateLED(coord, 'red', false);
 
                 // Clear fading timer on new lift
@@ -583,19 +599,14 @@
                     clearTimeout(fadingTimer);
                     fadingTimer = null;
                 }
-
-                // Track external lift for piece movement
-                if (!isLocalMessage) {
-                    externalLiftCoord = coord;
-                }
             } else if (action === 'P') {
-                // Place
+                // Place - State 2 → State 3 (normal move)
                 updateLED(coord, 'green', false);
 
                 // If external move, update board
-                if (!isLocalMessage && externalLiftCoord) {
-                    const fromCol = externalLiftCoord.charCodeAt(0) - 65;
-                    const fromRow = 8 - parseInt(externalLiftCoord.charAt(1));
+                if (!isLocalMessage && externalFirstLiftCoord) {
+                    const fromCol = externalFirstLiftCoord.charCodeAt(0) - 65;
+                    const fromRow = 8 - parseInt(externalFirstLiftCoord.charAt(1));
                     const toCol = coord.charCodeAt(0) - 65;
                     const toRow = 8 - parseInt(coord.charAt(1));
 
@@ -610,7 +621,7 @@
                     };
 
                     // Check if same location (pawn-to-queen conversion only on rows 1 and 8)
-                    if (externalLiftCoord === coord) {
+                    if (externalFirstLiftCoord === coord) {
                         const piece = board[fromRow][fromCol];
                         const coordKey = `${fromRow},${fromCol}`;
                         // White pawn to white queen (only on row 8, which is array index 0)
@@ -639,7 +650,8 @@
                         board[fromRow][fromCol] = '';
                     }
                     updateBoardUI();
-                    externalLiftCoord = null;
+                    externalFirstLiftCoord = null;
+                    externalSecondLiftCoord = null;
                 }
 
                 // Start 20s fading timer
@@ -651,12 +663,13 @@
                     fadingTimer = null;
                 }, 20000);
             } else if (action === 'R') {
-                // Return - figure returned to original position
+                // Return - figure returned to original position (State 2 → restart)
                 updateLED(coord, null, false);  // Turn off LED
 
                 // Clear external lift since figure returned
-                if (!isLocalMessage && externalLiftCoord === coord) {
-                    externalLiftCoord = null;
+                if (!isLocalMessage) {
+                    externalFirstLiftCoord = null;
+                    externalSecondLiftCoord = null;
                 }
 
                 // Clear fading timer
@@ -665,8 +678,57 @@
                     fadingTimer = null;
                 }
             } else if (action === 'X') {
-                // Killed
+                // Capture - State 4 → restart
+                // X at coord means piece is placed there, the other lifted piece is captured
                 updateLED(coord, 'red', true);
+
+                if (!isLocalMessage && externalFirstLiftCoord && externalSecondLiftCoord) {
+                    // Determine attacker origin and victim origin
+                    // If X is at c1 (first lift), attacker came from c2 (second lift)
+                    // If X is at c2 (second lift), attacker came from c1 (first lift)
+                    let attackerOrigin, victimOrigin;
+                    if (coord === externalFirstLiftCoord) {
+                        attackerOrigin = externalSecondLiftCoord;
+                        victimOrigin = externalFirstLiftCoord;
+                    } else {
+                        attackerOrigin = externalFirstLiftCoord;
+                        victimOrigin = externalSecondLiftCoord;
+                    }
+
+                    const fromCol = attackerOrigin.charCodeAt(0) - 65;
+                    const fromRow = 8 - parseInt(attackerOrigin.charAt(1));
+                    const toCol = coord.charCodeAt(0) - 65;
+                    const toRow = 8 - parseInt(coord.charAt(1));
+
+                    // Save for potential undo
+                    lastMove = {
+                        fromRow: fromRow,
+                        fromCol: fromCol,
+                        toRow: toRow,
+                        toCol: toCol,
+                        movedPiece: board[fromRow][fromCol],
+                        capturedPiece: board[toRow][toCol]
+                    };
+
+                    // Move attacker to capture position
+                    board[toRow][toCol] = board[fromRow][fromCol];
+                    board[fromRow][fromCol] = '';
+                    updateBoardUI();
+
+                    addLog(`Capture: ${attackerOrigin} → ${coord}`, 'info');
+
+                    externalFirstLiftCoord = null;
+                    externalSecondLiftCoord = null;
+                }
+
+                // Start 20s fading timer
+                if (fadingTimer) {
+                    clearTimeout(fadingTimer);
+                }
+                fadingTimer = setTimeout(() => {
+                    clearAllLEDs();
+                    fadingTimer = null;
+                }, 20000);
             }
         }
 
@@ -691,7 +753,8 @@
         function resetBoard() {
             board = JSON.parse(JSON.stringify(INITIAL_BOARD));
             selectedSquare = null;
-            externalLiftCoord = null;
+            externalFirstLiftCoord = null;
+            externalSecondLiftCoord = null;
             lastMove = null;
             promotedQueens.clear();
             document.getElementById('undo-btn').disabled = true;
