@@ -59,9 +59,9 @@ state2 --> state3 : hs(c2)=on / l(c2)=green,m:"c2-P"
 state2 --> state4 : hs(c2)=off / l(c2)=red,m:"c2-L"
 state4 --> restart : hs(c1)=on / l(c1)=blink,m:"c1-X"
 state4 --> restart : hs(c2)=on / l(c2)=blink,m:"c2-X"
-state2 --> restart : hs(c1)=on / l(c1)=off,m:"c1-P"
+state2 --> restart : hs(c1)=on / l(c1)=off,m:"c1-R"
 state3 --> restart : [auto]
-restart --> state1 : restart
+restart --> state1 : restart / clear all LEDs
 
 legend right
   | Symbol | Description |
@@ -70,6 +70,12 @@ legend right
   | FIA    | Figures In Air (counter: 0, 1, 2) |
   | l()    | LED status |
   | m      | MQTT message |
+  |        | |
+  | **MQTT Messages** | |
+  | c-L    | Lift: figure lifted from coordinate c |
+  | c-P    | Place: figure placed at coordinate c |
+  | c-R    | Return: figure returned to original position c |
+  | c-X    | Kill: figure captured at coordinate c |
 endlegend
 
 @enduml
@@ -85,6 +91,7 @@ New messages on topic /remotechess shall trigger the following actions:
 | -------------- | ------------------------------------------------------------ |
 | *coordinate*-L | 1. switch the Neopixel corresponding to *coordinate* to red<br />2. set neopixels corresponding to coordinates stored in LML, LMP and LMK to *off* (skip if the variable is empty)<br />3. set values of LMP and LMK to ""<br />4. set value of LML to *coordinate*<br />5. stop the timer "fading" |
 | *coordinate*-P | 1. switch the neopixel corresponding to *coordinate* to green<br />2. reset/start the timer "fading" and set it to 20s<br />3. set value of LMP to *coordinate*<br />4. if LMK is not empty, set it to "" and stop the blinking |
+| *coordinate*-R | 1. switch the neopixel corresponding to *coordinate* to *off*<br />2. set value of LML to "" |
 | *coordinate*-X | 1. switch the neopixel corresponding to *coordinate* to red blinking (200ms frequency)<br />2. set value of LMK to *coordinate* |
 
 When the timer fading expires, the Neopixels corresponding to the coordinates stored in LML, LMP and LMK shall be switched to *off* and all LEDs shall be switched to off.

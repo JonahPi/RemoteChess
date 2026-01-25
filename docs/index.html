@@ -363,6 +363,7 @@
                 document.getElementById('undo-btn').disabled = false;
 
                 // Check if same location (pawn-to-queen conversion only on rows 1 and 8)
+                let pieceTransformed = false;
                 if (selectedSquare.row === row && selectedSquare.col === col) {
                     const piece = board[row][col];
                     const coordKey = `${row},${col}`;
@@ -370,20 +371,24 @@
                     if (piece === '♙' && row === 0) {
                         board[row][col] = '♕';
                         promotedQueens.add(coordKey);
+                        pieceTransformed = true;
                         addLog('White pawn promoted to queen', 'info');
                     } else if (piece === '♕' && row === 0 && promotedQueens.has(coordKey)) {
                         board[row][col] = '♙';
                         promotedQueens.delete(coordKey);
+                        pieceTransformed = true;
                         addLog('White queen demoted to pawn', 'info');
                     }
                     // Black pawn to black queen (only on row 1, which is array index 7)
                     else if (piece === '♟' && row === 7) {
                         board[row][col] = '♛';
                         promotedQueens.add(coordKey);
+                        pieceTransformed = true;
                         addLog('Black pawn promoted to queen', 'info');
                     } else if (piece === '♛' && row === 7 && promotedQueens.has(coordKey)) {
                         board[row][col] = '♟';
                         promotedQueens.delete(coordKey);
+                        pieceTransformed = true;
                         addLog('Black queen demoted to pawn', 'info');
                     }
                 } else {
@@ -396,8 +401,12 @@
                 document.querySelector(`[data-coord="${fromCoord}"]`).classList.remove('selected');
                 selectedSquare = null;
 
-                // Publish place
-                publishMove(toCoord + '-P');
+                // Publish move: R for return to same position, P for place at new position or after transformation
+                if (fromCoord === toCoord && !pieceTransformed) {
+                    publishMove(toCoord + '-R');  // Return to original position
+                } else {
+                    publishMove(toCoord + '-P');  // Normal place or transformation
+                }
 
                 // Update UI
                 updateBoardUI();
@@ -641,6 +650,20 @@
                     clearAllLEDs();
                     fadingTimer = null;
                 }, 20000);
+            } else if (action === 'R') {
+                // Return - figure returned to original position
+                updateLED(coord, null, false);  // Turn off LED
+
+                // Clear external lift since figure returned
+                if (!isLocalMessage && externalLiftCoord === coord) {
+                    externalLiftCoord = null;
+                }
+
+                // Clear fading timer
+                if (fadingTimer) {
+                    clearTimeout(fadingTimer);
+                    fadingTimer = null;
+                }
             } else if (action === 'X') {
                 // Killed
                 updateLED(coord, 'red', true);

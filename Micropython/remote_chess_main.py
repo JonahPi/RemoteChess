@@ -24,7 +24,7 @@ COLOR_KILLED = (255, 0, 0)    # Red for killed pieces
 COLOR_OFF = (0, 0, 0)         # Off
 
 # Timing
-FADING_TIMEOUT_MS = 20000     # 20 seconds
+FADING_TIMEOUT_MS = 5000     # 20 seconds
 BLINK_FREQUENCY_MS = 200      # 200ms for blinking
 STARTUP_ROW_DURATION_MS = 800  # 800ms per row during startup
 
@@ -184,7 +184,7 @@ def mqtt_callback(topic, msg):
         return
 
     coord = message[:-2]  # Extract coordinate (e.g., 'A4' from 'A4-L')
-    action = message[-1]  # Extract action ('L', 'P', or 'X')
+    action = message[-1]  # Extract action ('L', 'P', 'R', or 'X')
     
     if action == 'L':
         # Lift action
@@ -215,7 +215,14 @@ def mqtt_callback(topic, msg):
             fading_timer.deinit()
         fading_timer = Timer(0)
         fading_timer.init(mode=Timer.ONE_SHOT, period=FADING_TIMEOUT_MS, callback=fading_callback)
-    
+
+    elif action == 'R':
+        # Return action - figure returned to original position
+        if DEMO_MODE:
+            print(f"[DEMO] Figure returned to {coord}")
+        set_neopixel(coord, COLOR_OFF)
+        LML = ""
+
     elif action == 'X':
         # Killed action
         if DEMO_MODE:
@@ -306,10 +313,16 @@ def scan_hall_sensors():
                             LMP = ""
                         elif FiguresInAir == 1:
                             # State 2: One piece in air
-                            # State 2 → restart (via State 3): Normal move or put back
-                            FiguresInAir = 0
-                            first_lift_coord = ""
-                            publish_move(f"{coord}-P")
+                            if coord == first_lift_coord:
+                                # State 2 → restart: Return to original position
+                                FiguresInAir = 0
+                                first_lift_coord = ""
+                                publish_move(f"{coord}-R")  # FSD: send R for return
+                            else:
+                                # State 2 → State 3 → restart: Normal move
+                                FiguresInAir = 0
+                                first_lift_coord = ""
+                                publish_move(f"{coord}-P")
                         elif FiguresInAir == 2:
                             # State 4 → restart: Capture placement
                             # When placing while 2 pieces are in air, this is a capture
