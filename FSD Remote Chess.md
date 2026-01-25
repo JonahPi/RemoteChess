@@ -43,6 +43,16 @@ This startup sequence serves as a visual confirmation that all hall sensors and 
 
 The startup sequence shall also be called when a re-start is triggered.
 
+### Connection indication
+
+After successfully connecting to the MQTT broker and subscribing to the topic, display a brief visual indication that the game is ready to start:
+
+1. Light up D4 and E4 in green (place color)
+2. Light up D3 and E3 in red (lift color)
+3. Keep LEDs on for 1 second, then turn them off
+
+This pattern indicates the center of the board and confirms the connection is established.
+
 ### Detecting and publishing movement
 
 ```
