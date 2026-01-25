@@ -43,8 +43,12 @@ MCP23017_ADDRESSES = [0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27]
 # ============= GLOBAL VARIABLES =============
 LML = ""  # Last Move Lift
 LMP = ""  # Last Move Place
-LMK = ""  # Last Move Killed
-FigureInAir = False
+LMK = ""  # Last Move Killed (coordinate with blinking LED)
+
+# State machine variables per FSD
+FiguresInAir = 0  # Counter: 0, 1, or 2
+first_lift_coord = ""  # Coordinate of first lifted piece (c1)
+second_lift_coord = ""  # Coordinate of second lifted piece (c2)
 
 # Hardware objects
 i2c = None
@@ -146,13 +150,15 @@ def mqtt_callback(topic, msg):
 
     # Handle restart message
     if message == "restart":
-        global FigureInAir
+        global FiguresInAir, first_lift_coord, second_lift_coord
         print("Restart triggered - running startup sequence")
         # Clear all state
         LML = ""
         LMP = ""
         LMK = ""
-        FigureInAir = False
+        FiguresInAir = 0
+        first_lift_coord = ""
+        second_lift_coord = ""
         if fading_timer:
             fading_timer.deinit()
         if blink_timer:
@@ -232,10 +238,23 @@ def publish_move(message):
 def scan_hall_sensors():
     """Scan all hall sensors and detect changes.
 
+    State machine per FSD:
+    - State 1: FIA=0, waiting for first lift
+    - State 2: FIA=1, one piece lifted (c1)
+    - State 3: FIA=0, piece placed (move complete)
+    - State 4: FIA=2, two pieces lifted (capture scenario)
+
+    Transitions:
+    - State 1 → 2: lift → FIA=1, send "c1-L"
+    - State 2 → 3: place at new coord → FIA=0, send "c2-P"
+    - State 2 → 4: lift second piece → FIA=2, send "c2-L"
+    - State 4 → restart: place → FIA=0, send "cX-X" (capture)
+    - State 2 → restart: place back at c1 → FIA=0, send "c1-P"
+
     When LEDs indicate a move from the other player (LML/LMP set),
     synchronizing figures to follow that move does NOT trigger MQTT messages.
     """
-    global FigureInAir, LML, LMP, LMK, previous_hall_states
+    global FiguresInAir, first_lift_coord, second_lift_coord, previous_hall_states, LML, LMP
 
     for row_idx, address in enumerate(MCP23017_ADDRESSES):
         try:
@@ -256,20 +275,25 @@ def scan_hall_sensors():
                         if coord == LML:
                             # Player is following indicated move - don't publish
                             # Turn off the red LED and clear LML
+                            # Note: Clearing LML here is necessary for sync scenarios since
+                            # no MQTT message is published (FSD note applies to self-received messages)
                             print(f"Sync lift at {coord} (following indicated move)")
-                            set_neopixel(LML, COLOR_OFF)
+                            set_neopixel(coord, COLOR_OFF)
                             LML = ""
                         elif coord == LMP:
                             # Player is removing killed piece from destination - no action
                             # Green LED stays on until new piece is placed
                             print(f"Sync kill removal at {coord} (removing captured piece)")
-                        elif not FigureInAir:
-                            # Regular lift - publish
-                            FigureInAir = True
+                        elif FiguresInAir == 0:
+                            # State 1 → State 2: First lift
+                            FiguresInAir = 1
+                            first_lift_coord = coord
                             publish_move(f"{coord}-L")
-                        else:
-                            # Killed piece - publish
-                            publish_move(f"{coord}-X")
+                        elif FiguresInAir == 1:
+                            # State 2 → State 4: Second lift (capture scenario)
+                            FiguresInAir = 2
+                            second_lift_coord = coord
+                            publish_move(f"{coord}-L")  # FSD: send L, not X
 
                     # Figure placed (was absent, now present)
                     elif not previous_state and current_state:
@@ -278,12 +302,21 @@ def scan_hall_sensors():
                             # Player is following indicated move - don't publish
                             # Turn off the green LED and clear LMP
                             print(f"Sync place at {coord} (following indicated move)")
-                            set_neopixel(LMP, COLOR_OFF)
+                            set_neopixel(coord, COLOR_OFF)
                             LMP = ""
-                        else:
-                            # Regular place - publish
-                            FigureInAir = False
+                        elif FiguresInAir == 1:
+                            # State 2: One piece in air
+                            # State 2 → restart (via State 3): Normal move or put back
+                            FiguresInAir = 0
+                            first_lift_coord = ""
                             publish_move(f"{coord}-P")
+                        elif FiguresInAir == 2:
+                            # State 4 → restart: Capture placement
+                            # When placing while 2 pieces are in air, this is a capture
+                            FiguresInAir = 0
+                            first_lift_coord = ""
+                            second_lift_coord = ""
+                            publish_move(f"{coord}-X")  # FSD: send X for capture
 
                     previous_hall_states[row_idx][col_idx] = current_state
 

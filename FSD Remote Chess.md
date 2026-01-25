@@ -45,14 +45,30 @@ The startup sequence shall also be called when a re-start is triggered.
 
 ### Detecting and publishing movement
 
-When initializing the program, the following 4 states should be safed:
-LastMoveLift: LML="", LastMovePlace: LMP="", LastMoveKilled: LMK="", FigureInAir = *false*,
+c1,c2=coordinates of first/second figure, hs() =Hall-sensor statu,  FIA=Number of Figures In The Air, l()=LED status, m: MQTT message
 
-If a hall-sensor changes the status from on (figure on field) to off (figure removed from field) and the status FigureInAir is equal to false, the action shall be to translate the sensor number to the correct field coordinate, set FigureInAir to true and publish the topic: *coordinate*-L (e.g. "A4-L" for a figure on field A4 which has been lifted in the air)
 
-When the hall-sensor changes from *off* to *on*, the boolean FigureInAir shall be set to *false* and the message "*coordinate*-P" shall be published
 
-If a hall status changes from on to off and FigureInAir is equal to *true* then the topic "*coordinate*-X" shall be published.
+```
+@startuml
+
+state "1: hs(c1)=ON, FIA=0" as state1
+state "2: hs(c1)=OFF, FIA=1" as state2
+state "3: hs(c2)=ON, FIA=0" as state3
+state "4: hs(c2)=OFF, FIA=2" as state4
+state "re-start" as restart
+
+state1 --> state2 : h(c1)=off / l(c1)=red,m:"c1-L"
+state2 --> state3 : h(c2)=on / l(c2)=green,m:"c2-P"
+state2 --> state4 : h(c2)=off / l(c2)=red,m:"c2-L"
+state4 --> restart : h(c1)=on / l(c1)=blink,m:"c1-X"
+state4 --> restart : h(c2)=on / l(c2)=blink,m:"c2-X"
+state2 --> restart : h(c1)=on / l(c1)=off,m:"c1-P"
+state3 --> restart 
+restart --> state1 : restart
+
+@enduml
+```
 
 **Important:** The state variables LML, LMP and LMK shall only be updated by the MQTT callback when receiving messages, not by the hall sensor scanning function. This ensures that when the board receives its own published message, the LED control works correctly (the callback clears the OLD coordinates before setting the new ones). The hall sensor scanning function shall only update FigureInAir and publish MQTT messages.
 
