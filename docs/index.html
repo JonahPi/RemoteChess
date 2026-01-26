@@ -227,13 +227,32 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <script>
-        // MQTT Configuration (hardcoded)
+        // MQTT Configuration for Adafruit IO
         const MQTT_CONFIG = {
-            broker: 'broker.hivemq.com',
-            port: 8884,
+            broker: 'io.adafruit.com',
+            port: 443,
             useSSL: true,
-            topic: 'home/chess'
+            topic: 'ToniTwn/feeds/chess',
+            username: 'ToniTwn'
         };
+
+        // Get or prompt for Adafruit IO Key (stored in localStorage)
+        function getApiKey() {
+            let key = localStorage.getItem('adafruit_io_key');
+            if (!key) {
+                key = prompt('Enter your Adafruit IO Key (API key):');
+                if (key) {
+                    localStorage.setItem('adafruit_io_key', key);
+                }
+            }
+            return key;
+        }
+
+        // Clear stored API key (call from console if needed: clearApiKey())
+        function clearApiKey() {
+            localStorage.removeItem('adafruit_io_key');
+            alert('API key cleared. Reload to enter a new key.');
+        }
 
         // Chess pieces as text labels
         const PIECE_LABELS = {
@@ -459,13 +478,20 @@
 
         // MQTT Functions
         function connectMQTT() {
-            const { broker, port, topic, useSSL } = MQTT_CONFIG;
+            const { broker, port, topic, useSSL, username } = MQTT_CONFIG;
+            const password = getApiKey();
+
+            if (!password) {
+                addLog('No API key provided. Cannot connect.', 'error');
+                updateConnectionStatus(false);
+                return;
+            }
 
             const clientId = 'chess_pwa_' + Math.random().toString(16).substr(2, 8);
             const protocol = useSSL ? 'wss' : 'ws';
-            
+
             addLog(`Connecting to ${protocol}://${broker}:${port}/mqtt`, 'info');
-            
+
             try {
                 mqttClient = new Paho.MQTT.Client(broker, port, '/mqtt', clientId);
 
@@ -484,7 +510,7 @@
 
                 const connectOptions = {
                     onSuccess: () => {
-                        addLog('Connected to MQTT broker!', 'success');
+                        addLog('Connected to Adafruit IO!', 'success');
                         updateConnectionStatus(true);
                         mqttClient.subscribe(topic);
                         addLog('Subscribed to ' + topic, 'success');
@@ -504,12 +530,20 @@
                     onFailure: (error) => {
                         addLog('Connection failed: ' + error.errorMessage, 'error');
                         updateConnectionStatus(false);
-                        // Auto-retry after 5 seconds
-                        setTimeout(connectMQTT, 5000);
+                        // Clear stored key if auth failed (likely wrong key)
+                        if (error.errorMessage && error.errorMessage.includes('not authorized')) {
+                            localStorage.removeItem('adafruit_io_key');
+                            addLog('Invalid API key cleared. Reload to try again.', 'error');
+                        } else {
+                            // Auto-retry after 5 seconds for other errors
+                            setTimeout(connectMQTT, 5000);
+                        }
                     },
                     useSSL: useSSL,
                     timeout: 10,
-                    keepAliveInterval: 30
+                    keepAliveInterval: 30,
+                    userName: username,
+                    password: password
                 };
 
                 mqttClient.connect(connectOptions);
