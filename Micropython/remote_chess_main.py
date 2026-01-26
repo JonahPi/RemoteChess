@@ -58,6 +58,9 @@ blink_state = False
 # Track previous hall sensor states (only used in non-demo mode)
 previous_hall_states = [[False] * 8 for _ in range(8)]
 
+# MQTT keep-alive tracking
+last_mqtt_activity = 0  # Reset on any MQTT publish
+
 # ============= MCP23017 Functions =============
 def mcp23017_init(i2c, address):
     """Initialize MCP23017 - set all pins as inputs with pull-ups"""
@@ -237,8 +240,10 @@ def mqtt_callback(topic, msg):
 
 def publish_move(message):
     """Publish move to MQTT topic"""
+    global last_mqtt_activity
     try:
         mqtt_client.publish(MQTT_TOPIC, message)
+        last_mqtt_activity = time.time()  # Reset ping timer
         print(f"Published: {message}")
     except Exception as e:
         print(f"MQTT publish error: {e}")
@@ -492,26 +497,49 @@ def main():
     print("=== Remote Chess Ready ===")
     if DEMO_MODE:
         print("Waiting for MQTT messages...")
-    
+
+    # Keep-alive ping interval (30 seconds, Adafruit IO uses 60s timeout)
+    global last_mqtt_activity
+    PING_INTERVAL = 30
+    last_mqtt_activity = time.time()
+
     # Main loop
-    try:
-        while True:
+    while True:
+        try:
             # Check for MQTT messages
             mqtt_client.check_msg()
-            
+
+            # Send keep-alive ping only when idle (no recent publish)
+            if time.time() - last_mqtt_activity > PING_INTERVAL:
+                mqtt_client.ping()
+                last_mqtt_activity = time.time()
+
             # Scan hall sensors (only if not in demo mode)
             if not DEMO_MODE:
                 scan_hall_sensors()
-            
+
             # Small delay to avoid overwhelming the system
             time.sleep(0.05)
-    
-    except KeyboardInterrupt:
-        print("\nShutting down...")
-    finally:
-        if mqtt_client:
-            mqtt_client.disconnect()
-        clear_neopixels([LML, LMP, LMK])
+
+        except OSError as e:
+            print(f"MQTT connection error: {e}")
+            print("Reconnecting...")
+            time.sleep(2)
+            try:
+                mqtt_client.connect()
+                mqtt_client.subscribe(MQTT_TOPIC)
+                last_mqtt_activity = time.time()
+                print("Reconnected to MQTT")
+            except Exception as reconnect_error:
+                print(f"Reconnect failed: {reconnect_error}")
+                time.sleep(5)
+
+        except KeyboardInterrupt:
+            print("\nShutting down...")
+            if mqtt_client:
+                mqtt_client.disconnect()
+            clear_neopixels([LML, LMP, LMK])
+            break
 
 # Run the program
 if __name__ == "__main__":
