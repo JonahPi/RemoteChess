@@ -6,12 +6,12 @@ Remote Chess allows two board players to compete online via a MQTT Broker. Lifti
 
 
 
-| Files / Directory   | Description                                                  |
-| ------------------- | ------------------------------------------------------------ |
-| FSD Remote Chess.md | Function Specification Document                              |
-| CAD                 | CAD STEP File for Chess Board with electronic and cover      |
-| docs                | Files used for Progressive Web App (PWA)2                    |
-| Electronics         | PCB schematic and Fritzing Files, Gerber Files               |
-| Micropython         | ESP32 Micropython Program, Secrets File sample, Board-test-script, State-Diagram |
-| pics                | Project pictures                                             |
+| Files / Directory                                            | Description                                                  |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| [FSD Remote Chess.md](https://github.com/JonahPi/RemoteChess/blob/main/FSD%20Remote%20Chess.md) | Function Specification Document                              |
+| CAD                                                          | CAD STEP File for Chess Board with electronic and cover      |
+| docs                                                         | Files used for Progressive Web App (PWA)2                    |
+| Electronics                                                  | PCB schematic and Fritzing Files, Gerber Files               |
+| Micropython                                                  | ESP32 Micropython Program, Secrets File sample, Board-test-script, State-Diagram |
+| pics                                                         | Project pictures                                             |
 
