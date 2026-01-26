@@ -16,6 +16,14 @@ The status of 64 hall sensors is detected by 8 PCBs, each of which has a MCP2301
 
 The ESP32 is located near the last row and the Neopixels are counted from there, this means that Fiel A8 (I2C address 0x20, GPA0) corresponds to the first Neopixel. Field H8 (I2C 0x27, GPA7) corresponds to the last Neopixel.
 
+##### Concept
+
+![Remote Chess Concept](Electronics/RemoteChessconcept.jpg)
+
+##### PCB Schematic (1x8 Row)
+
+![PCB Schematic for one row](Electronics/Schematics1x8_PCB.png)
+
 #### Module test
 
 The 8 PCBs shall be tested separately before the complete board assembly. To do this the I2C connections (SDA & SCL), the Neopixel data input (DIN) and the 5V input is directly connected to the XIAO ESP32-C6 (s.a. PIN assignement further below).
@@ -55,40 +63,12 @@ This pattern indicates the center of the board and confirms the connection is es
 
 ### Detecting and publishing movement
 
+![State Diagram]()
+
+![StateDiagram](C:\Users\bernd\OneDrive\Dokumente\GitHub\RemoteChess\Micropython\StateDiagram.png)
+
 ```
-@startuml
 
-state "1: hs(c1)=ON, FIA=0" as state1
-state "2: hs(c1)=OFF, FIA=1" as state2
-state "3: hs(c2)=ON, FIA=0" as state3
-state "4: hs(c2)=OFF, FIA=2" as state4
-state "re-start" as restart
-
-state1 --> state2 : hs(c1)=off / l(c1)=red,m:"c1-L"
-state2 --> state3 : hs(c2)=on / l(c2)=green,m:"c2-P"
-state2 --> state4 : hs(c2)=off / l(c2)=red,m:"c2-L"
-state4 --> restart : hs(c1)=on / l(c1)=blink,m:"c1-X"
-state4 --> restart : hs(c2)=on / l(c2)=blink,m:"c2-X"
-state2 --> restart : hs(c1)=on / l(c1)=off,m:"c1-R"
-state3 --> restart : [auto]
-restart --> state1 : restart / clear all LEDs
-
-legend right
-  | Symbol | Description |
-  | c1, c2 | Coordinates of first/second figure |
-  | hs()   | Hall-sensor status |
-  | FIA    | Figures In Air (counter: 0, 1, 2) |
-  | l()    | LED status |
-  | m      | MQTT message |
-  |        | |
-  | **MQTT Messages** | |
-  | c-L    | Lift: figure lifted from coordinate c |
-  | c-P    | Place: figure placed at coordinate c |
-  | c-R    | Return: figure returned to original position c |
-  | c-X    | Kill: figure captured at coordinate c |
-endlegend
-
-@enduml
 ```
 
 **Important:** The state variables LML, LMP and LMK shall only be updated by the MQTT callback when receiving messages, not by the hall sensor scanning function. This ensures that when the board receives its own published message, the LED control works correctly (the callback clears the OLD coordinates before setting the new ones). The hall sensor scanning function shall only update FiguresInAir and publish MQTT messages.
@@ -130,10 +110,12 @@ Time values, Blink-frequency and LED-colors shall be settable at the top of the 
 
 Use the following MQTT Broker Configuration
 
-​    broker: 'broker.hivemq.com',
-​    port: 8884,
-​    useSSL: true,
-​    topic: 'home/chess'
+MQTT_BROKER = "io.adafruit.com"  # IP address or hostname
+MQTT_PORT = 1883                     # Default MQTT port
+MQTT_USER = "your_adafruit_username"     # Leave empty string "" if no auth
+MQTT_PASSWORD = "your_adafruit_key" # Leave empty string "" if no auth
+MQTT_CLIENT_ID = "remote_chess_board_1"  # Unique ID for this board
+MQTT_TOPIC = "YourUserName/feeds/chess"   # MQTT topic for chess moves
 
 ### Demo mode
 
