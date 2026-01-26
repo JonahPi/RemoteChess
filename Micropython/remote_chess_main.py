@@ -8,14 +8,11 @@ import time
 from machine import Pin, I2C, Timer
 from neopixel import NeoPixel
 from umqtt.simple import MQTTClient
-import secrets
+from secrets import *
 
 # ============= CONFIGURATION =============
 # Demo Mode - Set to True to run without hall sensors
 DEMO_MODE = False  # Set to True for testing without hardware
-
-# MQTT Topic
-MQTT_TOPIC = b"home/chess"
 
 # LED Colors (R, G, B)
 COLOR_LIFT = (255, 0, 0)      # Red for lifted pieces
@@ -391,7 +388,7 @@ def connect_wifi():
     
     if not wlan.isconnected():
         print('Connecting to WiFi...')
-        wlan.connect(secrets.WIFI_SSID, secrets.WIFI_PASSWORD)
+        wlan.connect(WIFI_SSID, WIFI_PASSWORD)
         
         timeout = 20
         while not wlan.isconnected() and timeout > 0:
@@ -443,21 +440,21 @@ def main():
     
     # Connect to MQTT
     print("Connecting to MQTT broker...")
-    print(f"Broker: {secrets.MQTT_BROKER}:{secrets.MQTT_PORT}")
-    print(f"Client ID: {secrets.MQTT_CLIENT_ID}")
-    
+    print(f"Broker: {MQTT_BROKER}:{MQTT_PORT}")
+    print(f"Client ID: {MQTT_CLIENT_ID}")
+
     try:
         mqtt_client = MQTTClient(
-            secrets.MQTT_CLIENT_ID,
-            secrets.MQTT_BROKER,
-            port=secrets.MQTT_PORT,
-            user=secrets.MQTT_USER if secrets.MQTT_USER else None,
-            password=secrets.MQTT_PASSWORD if secrets.MQTT_PASSWORD else None
+            MQTT_CLIENT_ID,
+            MQTT_BROKER,
+            port=MQTT_PORT,
+            user=MQTT_USER if MQTT_USER else None,
+            password=MQTT_PASSWORD if MQTT_PASSWORD else None
         )
         mqtt_client.set_callback(mqtt_callback)
         mqtt_client.connect()
         mqtt_client.subscribe(MQTT_TOPIC)
-        print(f"MQTT connected and subscribed to {MQTT_TOPIC.decode()}")
+        print(f"MQTT connected and subscribed to {MQTT_TOPIC}")
 
         # Show connection indication: D4, E4 green and D5, E5 red for 1 second
         set_neopixel("D4", COLOR_PLACE)
