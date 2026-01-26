@@ -24,6 +24,18 @@ The ESP32 is located near the last row and the Neopixels are counted from there,
 
 ![PCB Schematic for one row](Electronics/Schematics1x8_PCB.png)
 
+| Quantity | Component     | Comment                |
+| -------- | ------------- | ---------------------- |
+| 16       | 100nF         |                        |
+| 1        | 10uF          |                        |
+| 1        | 47uF          | Stabilize Supply       |
+| 3        | 10kΩ          | Pull up I2C address    |
+| 2        | 12kΩ          | Pull up SDA, SCL       |
+| 1        | DSHP-03       | DIP-Switch for Address |
+| 8        | DRV5032FBDBZR | Hall Sensor            |
+| 8        | SK6812        | Neopixel               |
+| 1        | MCP23017-E/SO | GPIO Port Expander     |
+
 #### Module test
 
 The 8 PCBs shall be tested separately before the complete board assembly. To do this the I2C connections (SDA & SCL), the Neopixel data input (DIN) and the 5V input is directly connected to the XIAO ESP32-C6 (s.a. PIN assignement further below).
@@ -62,6 +74,8 @@ After successfully connecting to the MQTT broker and subscribing to the topic, d
 This pattern indicates the center of the board and confirms the connection is established.
 
 ### Detecting and publishing movement
+
+Figure movements is detected by a change in the hall-sensor state and indicated with LEDs, the actions cause MQTT messages to be send. The logic is defined in the state-diagram below.
 
 ![State Diagram]()
 
