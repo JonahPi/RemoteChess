@@ -77,13 +77,10 @@ This pattern indicates the center of the board and confirms the connection is es
 
 Figure movements is detected by a change in the hall-sensor state and indicated with LEDs, the actions cause MQTT messages to be send. The logic is defined in the state-diagram below.
 
-![State Diagram]()
 
-![StateDiagram](C:\Users\bernd\OneDrive\Dokumente\GitHub\RemoteChess\Micropython\StateDiagram.png)
+![StateDiagram](Micropython/StateDiagram.png)
 
-```
 
-```
 
 **Important:** The state variables LML, LMP and LMK shall only be updated by the MQTT callback when receiving messages, not by the hall sensor scanning function. This ensures that when the board receives its own published message, the LED control works correctly (the callback clears the OLD coordinates before setting the new ones). The hall sensor scanning function shall only update FiguresInAir and publish MQTT messages.
 
