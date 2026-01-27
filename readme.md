@@ -10,7 +10,7 @@ Remote Chess allows two board players or a board player and a App-user to compet
 | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | [FSD Remote Chess.md](https://github.com/JonahPi/RemoteChess/blob/main/FSD%20Remote%20Chess.md) | Function Specification Document                              |
 | CAD                                                          | CAD STEP File for Chess Board with electronic and cover      |
-| docs                                                         | Files used for Progressive Web App (PWA)2                    |
+| docs                                                         | Files used for Progressive Web App (PWA) published with Github Pages                |
 | Electronics                                                  | PCB schematic and Fritzing Files, Gerber Files               |
 | Micropython                                                  | ESP32 Micropython Program, Secrets File sample, Board-test-script, State-Diagram |
 | pics                                                         | Project pictures                                             |
