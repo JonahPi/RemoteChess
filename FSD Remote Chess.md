@@ -77,9 +77,7 @@ This pattern indicates the center of the board and confirms the connection is es
 
 Figure movements is detected by a change in the hall-sensor state and indicated with LEDs, the actions cause MQTT messages to be send. The logic is defined in the state-diagram below.
 
-![State Diagram]()
-
-![StateDiagram](C:\Users\bernd\OneDrive\Dokumente\GitHub\RemoteChess\Micropython\StateDiagram.png)
+![State Diagram](https://github.com/JonahPi/RemoteChess/blob/e65bbdca2e1e9faac90f1d0500e046fa5ddbeb7e/Micropython/StateDiagram.png)
 
 ```
 
