@@ -124,12 +124,16 @@ Time values, Blink-frequency and LED-colors shall be settable at the top of the 
 
 Use the following MQTT Broker Configuration
 
-MQTT_BROKER = "io.adafruit.com"  # IP address or hostname
-MQTT_PORT = 1883                     # Default MQTT port
-MQTT_USER = "your_adafruit_username"     # Leave empty string "" if no auth
-MQTT_PASSWORD = "your_adafruit_key" # Leave empty string "" if no auth
+```
+MQTT_BROKER = "io.adafruit.com"  
+MQTT_PORT = 1883                         # Default MQTT port
+MQTT_USER = "your_adafruit_username"
+MQTT_PASSWORD = "your_adafruit_key"      # Look for key-symbol in your adafruit account
 MQTT_CLIENT_ID = "remote_chess_board_1"  # Unique ID for this board
-MQTT_TOPIC = "YourUserName/feeds/chess"   # MQTT topic for chess moves
+MQTT_TOPIC = "YourUserName/feeds/chess"  # MQTT topic for chess moves, adapt your username
+```
+
+
 
 ### Demo mode
 
