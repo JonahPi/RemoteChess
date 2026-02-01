@@ -5,6 +5,8 @@ For Xiao ESP32-C6 with MicroPython
 
 import network
 import time
+import json
+import socket
 from machine import Pin, I2C, Timer
 from neopixel import NeoPixel
 from umqtt.simple import MQTTClient
@@ -15,14 +17,14 @@ from secrets import *
 DEMO_MODE = False  # Set to True for testing without hardware
 
 # LED Colors (R, G, B)
-COLOR_LIFT = (255, 0, 0)      # Red for lifted pieces
-COLOR_PLACE = (0, 255, 0)     # Green for placed pieces
-COLOR_KILLED = (255, 0, 0)    # Red for killed pieces
+COLOR_LIFT = (100, 0, 0)      # Red for lifted pieces
+COLOR_PLACE = (0, 100, 0)     # Green for placed pieces
+COLOR_KILLED = (100, 0, 0)    # Red for killed pieces
 COLOR_OFF = (0, 0, 0)         # Off
 
 # Timing
-FADING_TIMEOUT_MS = 5000     # 20 seconds
-BLINK_FREQUENCY_MS = 200      # 200ms for blinking
+FADING_TIMEOUT_MS = 15000     # 20 seconds
+BLINK_FREQUENCY_MS = 400      # 200ms for blinking
 STARTUP_ROW_DURATION_MS = 800  # 800ms per row during startup
 
 # Startup brightness (40% = 0.4)
@@ -385,25 +387,212 @@ def startup_led_test():
 
     print("Startup LED test complete")
 
-# ============= WiFi Connection =============
-def connect_wifi():
-    """Connect to WiFi"""
+# ============= WiFi Manager =============
+WIFI_CONFIG_FILE = "wifi_config.json"
+AP_SSID = "RemoteChess-Setup"
+
+def url_decode(s):
+    """Simple URL decoder for form data"""
+    s = s.replace('+', ' ')
+    parts = s.split('%')
+    result = parts[0]
+    for part in parts[1:]:
+        if len(part) >= 2:
+            try:
+                result += chr(int(part[:2], 16)) + part[2:]
+            except ValueError:
+                result += '%' + part
+        else:
+            result += '%' + part
+    return result
+
+def load_wifi_config():
+    """Load WiFi credentials from permanent storage"""
+    try:
+        with open(WIFI_CONFIG_FILE, 'r') as f:
+            config = json.load(f)
+            return config.get('ssid', ''), config.get('password', '')
+    except:
+        return '', ''
+
+def save_wifi_config(ssid, password):
+    """Save WiFi credentials to permanent storage"""
+    config = {'ssid': ssid, 'password': password}
+    with open(WIFI_CONFIG_FILE, 'w') as f:
+        json.dump(config, f)
+    print(f"WiFi config saved for network: {ssid}")
+
+def scan_wifi_networks():
+    """Scan for available WiFi networks"""
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
-    
-    if not wlan.isconnected():
-        print('Connecting to WiFi...')
-        wlan.connect(WIFI_SSID, WIFI_PASSWORD)
-        
-        timeout = 20
+    networks = wlan.scan()
+    wlan.active(False)
+    seen = set()
+    unique = []
+    for net in networks:
+        ssid = net[0].decode('utf-8') if isinstance(net[0], bytes) else net[0]
+        if ssid and ssid not in seen:
+            seen.add(ssid)
+            unique.append((ssid, net[3]))
+    unique.sort(key=lambda x: x[1], reverse=True)
+    return unique
+
+def generate_wifi_html(networks):
+    """Generate HTML page for WiFi network selection"""
+    options = ''
+    for ssid, rssi in networks:
+        options += '<option value="' + ssid + '">' + ssid + ' (' + str(rssi) + ' dBm)</option>'
+    return ('<!DOCTYPE html><html><head>'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<title>Remote Chess WiFi Setup</title>'
+        '<style>'
+        'body{font-family:Arial;margin:20px;background:#1a1a2e;color:#eee;}'
+        'h1{color:#e94560;}h2{color:#aaa;}'
+        'select,input,button{width:100%;padding:12px;margin:8px 0;'
+        'box-sizing:border-box;font-size:16px;border-radius:4px;border:1px solid #555;}'
+        'select,input{background:#16213e;color:#eee;}'
+        'button{background:#e94560;color:white;border:none;cursor:pointer;}'
+        '.c{max-width:400px;margin:0 auto;}'
+        '</style></head><body><div class="c">'
+        '<h1>Remote Chess</h1><h2>WiFi Setup</h2>'
+        '<form action="/connect" method="POST">'
+        '<label>Select Network:</label>'
+        '<select name="ssid">' + options + '</select>'
+        '<label>Password:</label>'
+        '<input type="password" name="password" placeholder="Enter WiFi password">'
+        '<button type="submit">Connect</button>'
+        '</form></div></body></html>')
+
+def start_wifi_manager():
+    """Start WiFi Manager AP with web portal for network selection"""
+    print("Scanning WiFi networks...")
+    networks = scan_wifi_networks()
+    print(f"Found {len(networks)} networks")
+
+    ap = network.WLAN(network.AP_IF)
+    ap.active(True)
+    ap.config(essid=AP_SSID)
+
+    print(f"WiFi Manager AP started: {AP_SSID}")
+    print("Connect to this network and open http://192.168.4.1")
+
+    addr = socket.getaddrinfo('0.0.0.0', 80)[0][-1]
+    s = socket.socket()
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind(addr)
+    s.listen(1)
+
+    html_page = generate_wifi_html(networks)
+
+    try:
+        while True:
+            cl, cl_addr = s.accept()
+            try:
+                request = cl.recv(1024).decode('utf-8')
+
+                if 'POST /connect' in request:
+                    body = request.split('\r\n\r\n')[-1]
+                    params = {}
+                    for param in body.split('&'):
+                        if '=' in param:
+                            key, value = param.split('=', 1)
+                            params[key] = url_decode(value)
+
+                    ssid = params.get('ssid', '')
+                    password = params.get('password', '')
+
+                    if ssid:
+                        response = ('<!DOCTYPE html><html><head>'
+                            '<meta name="viewport" content="width=device-width, initial-scale=1">'
+                            '<style>body{font-family:Arial;margin:20px;background:#1a1a2e;'
+                            'color:#eee;text-align:center;}h1{color:#e94560;}</style>'
+                            '</head><body>'
+                            '<h1>Connecting to ' + ssid + '...</h1>'
+                            '<p>The board will connect to the selected network.</p>'
+                            '<p>You can close this page.</p>'
+                            '</body></html>')
+                        cl.send('HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n')
+                        cl.send(response)
+                        cl.close()
+
+                        save_wifi_config(ssid, password)
+                        ap.active(False)
+                        s.close()
+                        return ssid, password
+                else:
+                    cl.send('HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n')
+                    cl.send(html_page)
+            except Exception as e:
+                print(f"WiFi Manager error: {e}")
+            finally:
+                try:
+                    cl.close()
+                except:
+                    pass
+    except Exception as e:
+        print(f"WiFi Manager server error: {e}")
+        s.close()
+        ap.active(False)
+        raise
+
+# ============= WiFi Connection =============
+def connect_wifi():
+    """Connect to WiFi with fallback to WiFi Manager hotspot"""
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
+
+    # Build list of credentials to try: saved config first, then secrets file
+    saved_ssid, saved_password = load_wifi_config()
+    credentials = []
+    if saved_ssid:
+        credentials.append((saved_ssid, saved_password))
+    if WIFI_SSID and WIFI_SSID != saved_ssid:
+        credentials.append((WIFI_SSID, WIFI_PASSWORD))
+
+    # Try each set of stored credentials
+    for ssid, password in credentials:
+        print(f'Trying WiFi: {ssid}...')
+        try:
+            wlan.connect(ssid, password)
+
+            timeout = 10
+            while not wlan.isconnected() and timeout > 0:
+                time.sleep(1)
+                timeout -= 1
+
+            if wlan.isconnected():
+                print('WiFi connected:', wlan.ifconfig())
+                return
+
+            print(f'Failed to connect to {ssid}')
+            wlan.disconnect()
+        except OSError as e:
+            print(f'WiFi error for {ssid}: {e}')
+            wlan.disconnect()
+
+    # No stored credentials worked - start WiFi Manager hotspot
+    print("No WiFi connection established - starting WiFi Manager hotspot...")
+    wlan.active(False)
+
+    while True:
+        ssid, password = start_wifi_manager()
+
+        wlan = network.WLAN(network.STA_IF)
+        wlan.active(True)
+        wlan.connect(ssid, password)
+
+        timeout = 10
         while not wlan.isconnected() and timeout > 0:
             time.sleep(1)
             timeout -= 1
-        
-        if not wlan.isconnected():
-            raise Exception("WiFi connection failed")
-    
-    print('WiFi connected:', wlan.ifconfig())
+
+        if wlan.isconnected():
+            print('WiFi connected:', wlan.ifconfig())
+            return
+
+        print(f'Failed to connect to {ssid} - restarting WiFi Manager...')
+        wlan.active(False)
 
 # ============= Main Program =============
 def main():
