@@ -101,6 +101,8 @@ When the timer fading expires, the Neopixels corresponding to the coordinates st
 
 When the player receives a move which is indicated by the red and green LEDs, he is supposed to synchronize the figures on the chess field with the indicated move. This synchronization shall not trigger a MQTT message. As soon as he lifts the figure to be synchronized from the correct position, the red led shall be switched off, when he places the figure on the correct field the green LED shall be switched off. It is important that the "on"->"off" sequence (figure is lifted) and the "off"->"on" sequence (figure is placed) are correctly detected. In case a figure is killed in that move, the destination hall-sensor is "on" in the beginning. The figure to be killed is then lifted (on->off: which should not cause any action) and the new figure is placed (off->on: switching off green destination LED).
 
+Till the move has been synchronized on the board, it shall not be possible to make a new move in the PWA. That the move has been synchronized on the board shall be indicated in the PWA by extinguishing the LEDs which indicated the movement in the app.
+
 ### Pin-assignment
 
 The program shall be written in Micropython and suitable for the development board Xiao ESP32-C6. Use the following pins:

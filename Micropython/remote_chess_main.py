@@ -240,6 +240,10 @@ def mqtt_callback(topic, msg):
         fading_timer = Timer(0)
         fading_timer.init(mode=Timer.ONE_SHOT, period=FADING_TIMEOUT_MS, callback=fading_callback)
 
+    elif action == 'O':
+        # Sync indication echo from board - ignore on receive
+        pass
+
 def publish_move(message):
     """Publish move to MQTT topic"""
     global last_mqtt_activity
@@ -270,7 +274,7 @@ def scan_hall_sensors():
     When LEDs indicate a move from the other player (LML/LMP set),
     synchronizing figures to follow that move does NOT trigger MQTT messages.
     """
-    global FiguresInAir, first_lift_coord, second_lift_coord, previous_hall_states, LML, LMP
+    global FiguresInAir, first_lift_coord, second_lift_coord, previous_hall_states, LML, LMP, LMK, fading_timer, blink_timer
 
     for row_idx, address in enumerate(MCP23017_ADDRESSES):
         try:
@@ -289,22 +293,29 @@ def scan_hall_sensors():
                     if previous_state and not current_state:
                         # Check if this is synchronizing to an indicated move (lift from LML)
                         if coord == LML:
-                            # Player is following indicated move - don't publish
-                            # Turn off the red LED and clear LML
-                            # Note: Clearing LML here is necessary for sync scenarios since
-                            # no MQTT message is published (FSD note applies to self-received messages)
+                            # Player is following indicated move - indicate sync to PWA
                             print(f"Sync lift at {coord} (following indicated move)")
                             set_neopixel(coord, COLOR_OFF)
                             LML = ""
+                            publish_move(f"{coord}-O")
+                        elif FiguresInAir == 0:
+                            # State 1 → State 2: First lift
+                            # FSD: restart → State 1 clears all LEDs
+                            clear_neopixels([LML, LMP, LMK])
+                            LML = ""
+                            LMP = ""
+                            LMK = ""
+                            if fading_timer:
+                                fading_timer.deinit()
+                            if blink_timer:
+                                blink_timer.deinit()
+                            FiguresInAir = 1
+                            first_lift_coord = coord
+                            publish_move(f"{coord}-L")
                         elif coord == LMP:
                             # Player is removing killed piece from destination - no action
                             # Green LED stays on until new piece is placed
                             print(f"Sync kill removal at {coord} (removing captured piece)")
-                        elif FiguresInAir == 0:
-                            # State 1 → State 2: First lift
-                            FiguresInAir = 1
-                            first_lift_coord = coord
-                            publish_move(f"{coord}-L")
                         elif FiguresInAir == 1:
                             # State 2 → State 4: Second lift (capture scenario)
                             FiguresInAir = 2
@@ -315,11 +326,11 @@ def scan_hall_sensors():
                     elif not previous_state and current_state:
                         # Check if this is synchronizing to an indicated move (place at LMP)
                         if coord == LMP:
-                            # Player is following indicated move - don't publish
-                            # Turn off the green LED and clear LMP
+                            # Player is following indicated move - indicate sync to PWA
                             print(f"Sync place at {coord} (following indicated move)")
                             set_neopixel(coord, COLOR_OFF)
                             LMP = ""
+                            publish_move(f"{coord}-O")
                         elif FiguresInAir == 1:
                             # State 2: One piece in air
                             if coord == first_lift_coord:

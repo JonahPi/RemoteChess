@@ -295,6 +295,7 @@
         let lastMove = null; // { fromRow, fromCol, toRow, toCol, movedPiece, capturedPiece }
         let boardFlipped = false;
         let promotedQueens = new Set(); // Track queens that were promoted from pawns
+        let awaitingSync = false; // Lock moves until board confirms sync
 
         // Initialize board UI
         function initBoard() {
@@ -356,6 +357,11 @@
         function handleSquareClick(row, col, coord) {
             if (!isConnected) {
                 addLog('Not connected to MQTT', 'error');
+                return;
+            }
+
+            if (awaitingSync) {
+                addLog('Waiting for board to sync move', 'error');
                 return;
             }
 
@@ -426,6 +432,7 @@
                     publishMove(toCoord + '-R');  // Return to original position
                 } else {
                     publishMove(toCoord + '-P');  // Normal place or transformation
+                    awaitingSync = true;  // Lock until board confirms sync
                 }
 
                 // Update UI
@@ -584,6 +591,7 @@
                 externalSecondLiftCoord = null;
                 lastMove = null;
                 promotedQueens.clear();
+                awaitingSync = false;
                 document.getElementById('undo-btn').disabled = true;
                 initBoard();
                 clearAllLEDs();
@@ -707,6 +715,7 @@
                 fadingTimer = setTimeout(() => {
                     clearAllLEDs();
                     fadingTimer = null;
+                    awaitingSync = false;
                 }, 20000);
             } else if (action === 'R') {
                 // Return - figure returned to original position (State 2 → restart)
@@ -774,7 +783,22 @@
                 fadingTimer = setTimeout(() => {
                     clearAllLEDs();
                     fadingTimer = null;
+                    awaitingSync = false;
                 }, 20000);
+            } else if (action === 'O') {
+                // Sync indication - board confirmed piece sync at coordinate
+                updateLED(coord, null, false);
+                delete ledStates[coord];
+
+                // Check if all colored LEDs are cleared (sync complete)
+                const hasActiveLEDs = Object.values(ledStates).some(s => s.color);
+                if (!hasActiveLEDs) {
+                    awaitingSync = false;
+                    if (fadingTimer) {
+                        clearTimeout(fadingTimer);
+                        fadingTimer = null;
+                    }
+                }
             }
         }
 
@@ -803,6 +827,7 @@
             externalSecondLiftCoord = null;
             lastMove = null;
             promotedQueens.clear();
+            awaitingSync = false;
             document.getElementById('undo-btn').disabled = true;
             initBoard();
             clearAllLEDs();
@@ -822,8 +847,9 @@
             board[lastMove.fromRow][lastMove.fromCol] = lastMove.movedPiece;
             board[lastMove.toRow][lastMove.toCol] = lastMove.capturedPiece;
 
-            // Clear LEDs
+            // Clear LEDs and unlock
             clearAllLEDs();
+            awaitingSync = false;
 
             // Update UI
             updateBoardUI();
